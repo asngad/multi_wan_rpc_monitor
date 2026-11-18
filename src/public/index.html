@@ -1,0 +1,1930 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+  <title>Multi-WAN RPC Network Monitor - UNUGHA NOC</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#ecfeff',
+              400: '#22d3ee',
+              500: '#06b6d4',
+              600: '#0891b2',
+              900: '#164e63',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Font Awesome Icons 6 -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Socket.io Client -->
+  <script src="/socket.io/socket.io.js"></script>
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans selection:bg-cyan-500 selection:text-white flex flex-col">
+
+  <!-- ==================================================================== -->
+  <!-- TOP NAVIGATION BAR (HANYA: DASHBOARD, TOPOLOGI, ADMIN) -->
+  <!-- ==================================================================== -->
+  <header class="bg-slate-900/95 backdrop-blur-md border-b border-slate-800/90 sticky top-0 z-50 transition-all">
+    <div class="max-w-7xl mx-auto px-3 sm:px-6">
+      <div class="flex items-center justify-between h-16 gap-2 sm:gap-4">
+        
+        <!-- BRANDING / LOGO -->
+        <div class="flex items-center space-x-2.5 sm:space-x-3 cursor-pointer" onclick="switchNavTab('dashboard')">
+          <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-cyan-500 via-indigo-600 to-purple-600 flex items-center justify-center shadow-lg shadow-cyan-500/20 text-white font-bold text-lg sm:text-xl flex-shrink-0">
+            <i class="fa-solid fa-network-wired"></i>
+          </div>
+          <div class="min-w-0">
+            <h1 class="text-sm sm:text-base font-extrabold tracking-tight text-white flex items-center gap-1.5 truncate">
+              <span>Multi-WAN RPC</span>
+              <span class="text-[10px] bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 px-1.5 py-0.2 rounded font-mono font-normal hidden xs:inline-block">NOC</span>
+            </h1>
+            <p class="text-[10px] sm:text-xs text-slate-400 truncate">Sistem Monitoring & Deteksi Anomali</p>
+          </div>
+        </div>
+
+        <!-- 3 MENU UTAMA NAVBAR (DESKTOP / LAPTOP / TABLET HORIZONTAL) -->
+        <nav class="hidden md:flex items-center bg-slate-950/80 p-1 rounded-xl border border-slate-800 shadow-inner space-x-1">
+          <!-- Menu 1: Dashboard -->
+          <button id="nav-btn-dashboard" onclick="switchNavTab('dashboard')" class="nav-tab-btn flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all duration-200 bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/30">
+            <i class="fa-solid fa-gauge-high"></i>
+            <span>Dashboard</span>
+          </button>
+          
+          <!-- Menu 2: Topologi -->
+          <button id="nav-btn-topologi" onclick="switchNavTab('topologi')" class="nav-tab-btn flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800/80 transition-all duration-200">
+            <i class="fa-solid fa-sitemap"></i>
+            <span>Topologi</span>
+          </button>
+
+          <!-- Menu 3: Pengaturan -->
+          <button id="nav-btn-admin" onclick="switchNavTab('admin')" class="nav-tab-btn flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800/80 transition-all duration-200">
+            <i class="fa-solid fa-gear"></i>
+            <span>Pengaturan</span>
+            <span class="w-2 h-2 rounded-full bg-purple-400 animate-pulse"></span>
+          </button>
+        </nav>
+
+        <!-- STATUS BADGES & MOBILE TOGGLE (KANAN) -->
+        <div class="flex items-center gap-2 sm:gap-3">
+          
+          <!-- Skenario Aktif Indicator (Muncul saat ada simulasi) -->
+          <div id="activeScenarioBadge" class="hidden items-center gap-1.5 bg-amber-500/20 border border-amber-500/40 text-amber-300 px-2.5 py-1 rounded-lg text-[11px] font-medium">
+            <i class="fa-solid fa-triangle-exclamation animate-pulse"></i>
+            <span class="hidden sm:inline">Simulasi:</span>
+            <strong id="scenarioName">NORMAL</strong>
+            <span id="scenarioTimer" class="font-mono text-[10px] bg-amber-500/30 px-1 rounded">0s</span>
+          </div>
+
+          <!-- Live RPC Connection Status -->
+          <div class="flex items-center gap-1.5 bg-slate-800/80 border border-slate-700/60 px-2.5 py-1.5 rounded-lg text-[11px] font-mono">
+            <span class="relative flex h-2 w-2">
+              <span id="socketPingDot" class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span id="socketStatusDot" class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            </span>
+            <span id="socketStatusText" class="text-emerald-400 font-semibold hidden sm:inline">RPC LIVE</span>
+          </div>
+
+          <!-- Audio Alert Toggle -->
+          <button id="toggleAudioBtn" class="bg-slate-800 hover:bg-slate-700 text-slate-300 p-2 rounded-lg border border-slate-700 transition flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9" title="Toggle Suara Peringatan Audio">
+            <i id="audioIcon" class="fa-solid fa-volume-high text-xs sm:text-sm"></i>
+          </button>
+
+          <!-- USER AUTH BUTTON / PROFILE CHIP -->
+          <div id="userAuthSection" class="flex items-center">
+            <!-- Saat Belum Login: Tombol Masuk / Daftar -->
+            <button id="openAuthBtn" onclick="openAuthModal('login')" class="bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold px-2.5 sm:px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 shadow-md shadow-cyan-900/30 transition">
+              <i class="fa-solid fa-right-to-bracket text-xs"></i>
+              <span class="hidden sm:inline">Masuk</span>
+            </button>
+
+            <!-- Saat Sudah Login: Chip Profil & Tombol Keluar -->
+            <div id="userProfileChip" class="hidden items-center gap-2 bg-slate-800/90 border border-slate-700/80 px-2 sm:px-2.5 py-1 rounded-xl text-xs">
+              <div onclick="openAuthModal('session')" class="flex items-center gap-1.5 cursor-pointer hover:opacity-80 transition" title="Lihat Profil Akun">
+                <div class="w-6 h-6 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 flex items-center justify-center font-bold text-[10px]">
+                  <i class="fa-solid fa-user"></i>
+                </div>
+                <div class="hidden sm:block text-left">
+                  <div id="userNameDisplay" class="font-bold text-slate-200 text-[11px] leading-tight truncate max-w-[100px]">Admin</div>
+                  <div id="userRoleDisplay" class="text-[9px] text-cyan-400 font-mono leading-tight">Admin</div>
+                </div>
+              </div>
+              <button onclick="promptExitApp()" class="flex items-center gap-1 bg-rose-950/60 hover:bg-rose-900/80 border border-rose-500/40 text-rose-300 hover:text-white px-2 py-0.5 rounded-lg text-[11px] font-semibold transition" title="Keluar dari Aplikasi">
+                <i class="fa-solid fa-arrow-right-from-bracket text-[10px]"></i>
+                <span class="hidden xs:inline">Logout</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- HAMBURGER MENU BUTTON (HANYA MUNCUL DI HP / TABLET KECIL) -->
+          <button id="mobileMenuToggleBtn" onclick="toggleMobileMenu()" class="md:hidden bg-slate-800 hover:bg-slate-700 text-slate-200 p-2 rounded-lg border border-slate-700 transition flex items-center justify-center w-8 h-8" aria-label="Toggle Navigation Menu">
+            <i id="mobileMenuIcon" class="fa-solid fa-bars text-sm"></i>
+          </button>
+
+        </div>
+
+      </div>
+
+      <!-- MOBILE NAVIGATION DRAWER (COLLAPSIBLE UNTUK SMARTPHONE / TABLET) -->
+      <div id="mobileMenuDrawer" class="hidden md:hidden pb-3 pt-2 border-t border-slate-800/80 space-y-1.5 transition-all duration-300">
+        <button onclick="switchNavTab('dashboard')" class="mobile-nav-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-xs font-semibold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+          <span class="flex items-center gap-2.5"><i class="fa-solid fa-gauge-high w-4 text-center"></i> Dashboard</span>
+          <i class="fa-solid fa-chevron-right text-[10px] opacity-60"></i>
+        </button>
+        <button onclick="switchNavTab('topologi')" class="mobile-nav-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-xs font-semibold text-slate-300 hover:bg-slate-800/70 border border-transparent">
+          <span class="flex items-center gap-2.5"><i class="fa-solid fa-sitemap w-4 text-center"></i> Topologi</span>
+          <i class="fa-solid fa-chevron-right text-[10px] opacity-60"></i>
+        </button>
+        <button onclick="switchNavTab('admin')" class="mobile-nav-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-xs font-semibold text-slate-300 hover:bg-slate-800/70 border border-transparent">
+          <span class="flex items-center gap-2.5"><i class="fa-solid fa-gear w-4 text-center"></i> Pengaturan (Simulasi, CRUD & Uji)</span>
+          <span class="w-2 h-2 rounded-full bg-purple-400"></span>
+        </button>
+        <!-- Mobile Auth Button -->
+        <div class="pt-2 border-t border-slate-800/80">
+          <button id="mobileAuthActionBtn" onclick="handleMobileAuthClick()" class="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition">
+            <i class="fa-solid fa-right-to-bracket text-cyan-400"></i>
+            <span id="mobileAuthBtnText">Masuk / Registrasi Akun</span>
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- ==================================================================== -->
+  <!-- MAIN CONTENT CONTAINER (RESPONSIF UNTUK SEMUA UKURAN LAYAR) -->
+  <!-- ==================================================================== -->
+  <main class="max-w-7xl w-full mx-auto px-3 sm:px-6 py-4 sm:py-6 flex-1 space-y-6">
+
+    <!-- ================================================================== -->
+    <!-- VIEW 1: DASHBOARD (METRIK AGREGAT, 4 WAN, LIVE CHARTS, ALERT FEED) -->
+    <!-- ================================================================== -->
+    <div id="view-dashboard" class="space-y-6 transition-all duration-300">
+      
+      <!-- BARIS 1: METRIK AGREGAT MULTI-WAN (4 KARTU STATISTIK RINGKAS) -->
+      <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        
+        <!-- Card 1: Status 4 Multi-WAN -->
+        <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-3.5 sm:p-4 shadow-sm relative overflow-hidden">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-[11px] uppercase font-semibold text-slate-400 tracking-wider">Status 4 Multi-WAN</span>
+            <i class="fa-solid fa-shield-halved text-cyan-400"></i>
+          </div>
+          <div class="flex items-baseline gap-2">
+            <span id="aggStatus" class="text-xl sm:text-2xl font-black text-emerald-400">OPTIMAL</span>
+            <span id="aggActiveCount" class="text-xs text-slate-400 font-mono">(4/4 Link)</span>
+          </div>
+          <div class="mt-2 text-xs text-slate-400 flex items-center justify-between">
+            <span>Kesehatan Link</span>
+            <span id="aggHealthScore" class="font-bold text-emerald-400 font-mono">100%</span>
+          </div>
+          <div class="w-full bg-slate-800 h-1.5 rounded-full mt-1.5 overflow-hidden">
+            <div id="aggHealthBar" class="bg-emerald-500 h-1.5 rounded-full transition-all duration-500" style="width: 100%"></div>
+          </div>
+        </div>
+
+        <!-- Card 2: Total Throughput & Utilisasi -->
+        <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-3.5 sm:p-4 shadow-sm relative overflow-hidden">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-[11px] uppercase font-semibold text-slate-400 tracking-wider">Total Throughput</span>
+            <i class="fa-solid fa-gauge-high text-emerald-400"></i>
+          </div>
+          <div class="flex items-baseline gap-1">
+            <span id="aggTotalThroughput" class="text-xl sm:text-2xl font-black text-white font-mono">0.0</span>
+            <span class="text-xs text-slate-400">Mbps</span>
+          </div>
+          <div class="mt-2 text-xs text-slate-400 flex items-center justify-between">
+            <span>Pipa: <strong id="aggTotalCapacity" class="text-slate-300">400 Mbps</strong></span>
+            <span>Utilisasi: <strong id="aggUtilPercent" class="text-cyan-400 font-mono">0%</strong></span>
+          </div>
+          <div class="w-full bg-slate-800 h-1.5 rounded-full mt-1.5 overflow-hidden">
+            <div id="aggUtilBar" class="bg-cyan-500 h-1.5 rounded-full transition-all duration-500" style="width: 0%"></div>
+          </div>
+        </div>
+
+        <!-- Card 3: Core Gateway & Klien Linksys -->
+        <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-3.5 sm:p-4 shadow-sm relative overflow-hidden">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-[11px] uppercase font-semibold text-slate-400 tracking-wider">MikroTik & 16 Linksys</span>
+            <i class="fa-solid fa-server text-indigo-400"></i>
+          </div>
+          <div class="flex items-baseline gap-2">
+            <span id="aggConnectedClients" class="text-xl sm:text-2xl font-black text-indigo-400 font-mono">534</span>
+            <span class="text-xs text-slate-400">Pengguna Aktif</span>
+          </div>
+          <div class="mt-2 text-xs text-slate-400 flex items-center justify-between">
+            <span>CPU MikroTik: <strong id="mikrotikCpuDisplay" class="text-slate-200 font-mono">18%</strong></span>
+            <span>AP Aktif: <strong id="activeRoutersCount" class="text-emerald-400 font-mono">16/16 UP</strong></span>
+          </div>
+          <div class="w-full bg-slate-800 h-1.5 rounded-full mt-1.5 overflow-hidden">
+            <div id="mikrotikCpuBar" class="bg-indigo-500 h-1.5 rounded-full transition-all duration-500" style="width: 18%"></div>
+          </div>
+        </div>
+
+        <!-- Card 4: RPC Telemetri Latency -->
+        <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-3.5 sm:p-4 shadow-sm relative overflow-hidden">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-[11px] uppercase font-semibold text-slate-400 tracking-wider">Transmisi RPC</span>
+            <i class="fa-solid fa-bolt text-amber-400"></i>
+          </div>
+          <div class="flex items-baseline gap-1">
+            <span id="rpcLatencyDisplay" class="text-xl sm:text-2xl font-black text-amber-400 font-mono">0.85</span>
+            <span class="text-xs text-slate-400">ms</span>
+          </div>
+          <div class="mt-2 text-xs text-slate-400 flex items-center justify-between">
+            <span>Total Panggilan RPC</span>
+            <span id="rpcCallsSent" class="font-bold text-slate-200 font-mono">0</span>
+          </div>
+          <div class="mt-1 text-[10px] text-emerald-400 flex items-center gap-1 font-mono">
+            <i class="fa-solid fa-circle-check text-[9px]"></i>
+            <span>Sub-milidetik (JSON-RPC 2.0)</span>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- BARIS 2: KARTU DETAIL 4 WAN INDIVIDUAL -->
+      <section class="space-y-3">
+        <div class="flex items-center justify-between">
+          <h2 class="text-xs sm:text-sm font-bold text-white flex items-center gap-2">
+            <i class="fa-solid fa-satellite-dish text-cyan-400"></i>
+            <span>Kinerja 4 Jalur WAN Terpantau</span>
+          </h2>
+          <span class="text-[11px] text-slate-400 font-mono">Probe Interval: 1000ms</span>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4" id="wanCardsContainer">
+          <!-- Rendered dynamically by app.js -->
+        </div>
+      </section>
+
+      <!-- BARIS 3: GRAFIK TELEMETRI REAL-TIME (CHART.JS) -->
+      <section class="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5">
+        
+        <!-- Grafik 1: Throughput Rx / Tx -->
+        <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-4 sm:p-5 shadow-sm">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <h2 class="text-xs sm:text-sm font-bold text-white flex items-center gap-2">
+                <i class="fa-solid fa-chart-area text-cyan-400"></i>
+                <span>Throughput 4 WAN: Citra, Indibiz, Starlink, Starlite (Mbps)</span>
+              </h2>
+              <p class="text-[11px] text-slate-400">Monitoring volume trafik masuk (Rx) & keluar (Tx) real-time</p>
+            </div>
+            <span class="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded font-mono hidden sm:inline-block">Live Stream</span>
+          </div>
+          <div class="h-56 sm:h-64 relative">
+            <canvas id="throughputChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Grafik 2: Latensi RTT (Round Trip Time) & Z-Score -->
+        <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-4 sm:p-5 shadow-sm">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <h2 class="text-xs sm:text-sm font-bold text-white flex items-center gap-2">
+                <i class="fa-solid fa-wave-square text-emerald-400"></i>
+                <span>Latensi RTT (ms) & Deteksi Lonjakan Z-Score</span>
+              </h2>
+              <p class="text-[11px] text-slate-400">Deteksi deviasi latensi Starlink, Fiber Optic, & Peering</p>
+            </div>
+            <span class="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded font-mono hidden sm:inline-block">Z-Score Adaptif</span>
+          </div>
+          <div class="h-56 sm:h-64 relative">
+            <canvas id="latencyChart"></canvas>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- BARIS 4: PACKET LOSS & LOG FEED ANOMALI -->
+      <section class="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5">
+        
+        <!-- Grafik 3: Packet Loss (%) -->
+        <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-4 sm:p-5 shadow-sm">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <h2 class="text-xs sm:text-sm font-bold text-white flex items-center gap-2">
+                <i class="fa-solid fa-signal text-rose-400"></i>
+                <span>Packet Loss (%) 4 WAN</span>
+              </h2>
+              <p class="text-[11px] text-slate-400">Toleransi degradasi jalur & failover</p>
+            </div>
+          </div>
+          <div class="h-56 sm:h-64 relative">
+            <canvas id="packetLossChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Feed Deteksi Dini Anomali & Rekomendasi NOC -->
+        <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-4 sm:p-5 shadow-sm lg:col-span-2 flex flex-col">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <h2 class="text-xs sm:text-sm font-bold text-white flex items-center gap-2">
+                <i class="fa-solid fa-list-check text-amber-400"></i>
+                <span>Feed Deteksi Dini Anomali & Rekomendasi NOC</span>
+              </h2>
+              <p class="text-[11px] text-slate-400">Insiden Multi-WAN, Core MikroTik, & 16 Linksys EA7500</p>
+            </div>
+            <button id="clearAlertsBtn" class="text-xs text-slate-400 hover:text-white transition px-2 py-1 rounded bg-slate-800 hover:bg-slate-700">
+              <i class="fa-solid fa-broom mr-1"></i>Bersihkan
+            </button>
+          </div>
+          
+          <div class="overflow-y-auto max-h-60 sm:max-h-64 space-y-2 pr-1" id="alertFeedContainer">
+            <div class="text-center py-10 text-slate-500 text-xs">
+              <i class="fa-solid fa-circle-check text-emerald-500/50 text-3xl mb-2 block"></i>
+              Belum ada insiden anomali terdeteksi. Sistem berjalan normal.
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- BARIS 5: DISTRIBUSI MULTI-WAN & STATUS AKSES INTERNET REAL-TIME 16 ROUTER -->
+      <section class="bg-slate-900/90 border border-slate-800 rounded-xl p-4 sm:p-5 shadow-sm space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-800">
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              <h2 class="text-xs sm:text-sm font-bold text-white flex items-center gap-2">
+                <i class="fa-solid fa-satellite-dish text-cyan-400"></i>
+                <span>Distribusi 4 ISP & Status Akses Internet Real-Time 16 Router Linksys</span>
+              </h2>
+            </div>
+            <p class="text-[11px] text-slate-400 mt-0.5">Pemetaan jalur keluar (Egress Route) MikroTik PCC, gateway NAT, & verifikasi internet per perangkat</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <span id="dashboardInternetSummaryBadge" class="bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 text-[11px] font-mono px-3 py-1 rounded-lg font-semibold flex items-center gap-1.5">
+              <i class="fa-solid fa-circle-check text-emerald-400"></i>
+              <span id="dashboardInternetSummaryText">16/16 Router Online</span>
+            </span>
+            <button onclick="runInstantInternetVerification()" id="btnVerifyAllDashboard" class="bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs px-3 py-1.5 rounded-lg shadow font-medium flex items-center gap-1.5 transition">
+              <i class="fa-solid fa-arrows-rotate text-[11px]"></i>
+              <span class="hidden sm:inline">Uji Akses Semua</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Tabel Distribusi Internet Router -->
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs text-slate-300">
+            <thead class="text-[11px] font-mono uppercase bg-slate-950/60 text-slate-400 border-b border-slate-800">
+              <tr>
+                <th class="py-2.5 px-3">Router & Model</th>
+                <th class="py-2.5 px-3">IP Lokal</th>
+                <th class="py-2.5 px-3 text-center">Status Internet</th>
+                <th class="py-2.5 px-3">Alur Jalur ISP (Egress PCC)</th>
+                <th class="py-2.5 px-3 text-center">Latensi Internet</th>
+                <th class="py-2.5 px-3 text-right">Throughput</th>
+                <th class="py-2.5 px-3 text-center">Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="dashboardInternetTableBody" class="divide-y divide-slate-800/60 font-mono text-xs">
+              <!-- Rendered dynamically by app.js -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- ================================================================== -->
+    <!-- VIEW 2: TOPOLOGI (HIERARKI MULTI-TIER & 16 ROUTER LINKSYS EA7500) -->
+    <!-- ================================================================== -->
+    <div id="view-topologi" class="hidden space-y-6 transition-all duration-300">
+      
+      <!-- HEADER TOPOLOGI & KONTROL TRACE RUTE -->
+      <section class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-lg">
+        <div class="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-800">
+          <div>
+            <div class="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 mb-1.5">
+              <i class="fa-solid fa-network-wired"></i>
+              <span>Arsitektur Jaringan Multi-WAN Kampus UNUGHA</span>
+            </div>
+            <h2 class="text-base sm:text-lg font-bold text-white tracking-tight flex items-center gap-2">
+              <i class="fa-solid fa-sitemap text-cyan-400"></i>
+              <span>Diagram Topologi 4 ISP ➔ Gateway-LB ➔ MikroTik CHR ➔ 16 Router Linksys EA7500</span>
+            </h2>
+            <p class="text-xs text-slate-400 max-w-3xl mt-0.5">
+              Seluruh 16 router Linksys OpenWrt EA7500 / access point kampus memperoleh konektivitas internet terdistribusi dari ke-4 ISP (Citra, Indibiz, Starlink, Starlite) melalui gateway MikroTik PCC.
+            </p>
+          </div>
+
+          <!-- KONTROL TRACE JALUR & STATUS MULTI-WAN -->
+          <div class="flex flex-wrap items-center gap-2.5">
+            <div class="flex items-center gap-2 bg-slate-950/80 border border-slate-800 rounded-xl px-3 py-1.5">
+              <label for="traceDeviceSelect" class="text-xs text-slate-400 font-medium whitespace-nowrap">
+                <i class="fa-solid fa-route text-cyan-400 mr-1"></i>Trace Jalur:
+              </label>
+              <select id="traceDeviceSelect" class="bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:border-cyan-500">
+                <option value="">-- Pilih Perangkat untuk Trace --</option>
+                <optgroup label="Cabang 1: Perpus & Rektorat">
+                  <option value="ea7500-01">GD-BEM01 (10.0.2.10)</option>
+                  <option value="ea7500-02">Perpus-Atas (10.27.22.45)</option>
+                  <option value="ea7500-03">Biro1-B (10.0.3.10)</option>
+                  <option value="ea7500-04">Biro1A (10.0.3.11)</option>
+                  <option value="ea7500-05">Biro1 (10.27.23.23)</option>
+                  <option value="ea7500-06">FMIKOM (10.27.23.17)</option>
+                  <option value="ea7500-07">AP-Rektorat (10.0.3.30)</option>
+                </optgroup>
+                <optgroup label="Cabang 2: Gedung D & Kelas A">
+                  <option value="ea7500-08">GD1-LT1 (10.27.51.12)</option>
+                  <option value="ea7500-09">A5 (10.0.4.5)</option>
+                  <option value="ea7500-10">A6 (10.0.4.6)</option>
+                  <option value="ea7500-11">A7 (10.0.4.7)</option>
+                  <option value="ea7500-12">A8 (10.0.4.8)</option>
+                </optgroup>
+                <optgroup label="Cabang 3: LabKOM & Gedung H">
+                  <option value="ea7500-13">LabKOM (10.27.41.12)</option>
+                  <option value="ea7500-14">GH2-LT2 (10.27.43.81)</option>
+                  <option value="ea7500-15">GH2-LT3 (10.0.5.30)</option>
+                  <option value="ea7500-16">GH2-RDown (10.27.43.80)</option>
+                </optgroup>
+              </select>
+            </div>
+
+            <button id="resetTraceBtn" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-3 py-1.5 rounded-xl border border-slate-700 transition flex items-center gap-1.5">
+              <i class="fa-solid fa-rotate-left"></i>
+              <span>Reset</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- STATUS BARIS MULTI-WAN SUMMARY -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-3.5 text-xs font-mono">
+          <div class="bg-slate-950/60 border border-slate-800/80 rounded-lg p-2 flex items-center justify-between">
+            <span class="text-slate-400">PCC Engine:</span>
+            <span class="text-emerald-400 font-bold flex items-center gap-1"><i class="fa-solid fa-circle text-[8px]"></i> 4-WAN Active</span>
+          </div>
+          <div class="bg-slate-950/60 border border-slate-800/80 rounded-lg p-2 flex items-center justify-between">
+            <span class="text-slate-400">Gateway CHR:</span>
+            <span class="text-cyan-300 font-bold">10.27.42.1</span>
+          </div>
+          <div class="bg-slate-950/60 border border-slate-800/80 rounded-lg p-2 flex items-center justify-between">
+            <span class="text-slate-400">Total AP EA7500:</span>
+            <span class="text-amber-300 font-bold">16 Unit UP (100%)</span>
+          </div>
+          <div class="bg-slate-950/60 border border-slate-800/80 rounded-lg p-2 flex items-center justify-between">
+            <span class="text-slate-400">Failover:</span>
+            <span class="text-indigo-300 font-bold">Auto Sub-Second</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- INSPECTOR PANEL: ALUR KONEKSI LENGKAP KE 4 ISP (MUNCUL KETIKA PERANGKAT DIPILIH) -->
+      <section id="routeInspectorPanel" class="bg-gradient-to-r from-slate-900 via-slate-900 to-cyan-950/40 border border-cyan-500/30 rounded-2xl p-4 sm:p-5 shadow-xl transition-all duration-300">
+        <div class="flex flex-wrap items-start justify-between gap-3 pb-3 border-b border-slate-800">
+          <div>
+            <div class="text-[11px] font-mono text-cyan-400 flex items-center gap-1.5 mb-1">
+              <i class="fa-solid fa-circle-dot animate-ping text-[8px]"></i>
+              <span>INSPEKSI ALUR MULTI-WAN & STATUS HOP-BY-HOP</span>
+            </div>
+            <h3 class="text-base font-bold text-white flex items-center gap-2">
+              <span id="inspectDevIcon"><i class="fa-solid fa-router text-cyan-400"></i></span>
+              <span id="inspectDevName">GD-BEM01</span>
+              <span id="inspectDevModel" class="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-mono font-normal">Linksys OpenWrt EA7500</span>
+            </h3>
+            <p id="inspectDevLoc" class="text-xs text-slate-400 mt-0.5">Gedung BEM & Kemahasiswaan Kampus UNUGHA</p>
+          </div>
+
+          <div class="flex items-center gap-2 text-xs font-mono">
+            <span class="bg-slate-800/80 text-cyan-300 px-3 py-1 rounded-lg border border-cyan-500/20">
+              IP: <strong id="inspectDevIp">10.0.2.10/24</strong>
+            </span>
+            <span class="bg-emerald-950/60 text-emerald-300 px-2.5 py-1 rounded-lg border border-emerald-500/30">
+              Status: <strong id="inspectDevStatus">UP (Optimal)</strong>
+            </span>
+          </div>
+        </div>
+
+        <!-- RUTE DETAIL HOP BY HOP DARI 4 ISP -->
+        <div class="mt-4 space-y-3">
+          <div class="text-xs font-semibold text-slate-300 flex items-center justify-between">
+            <span>Rute Koneksi dari Internet ➔ MikroTik ➔ Switch ➔ Router:</span>
+            <span class="text-[11px] text-cyan-400 font-mono">Multi-WAN Active (PCC 4-ISP)</span>
+          </div>
+
+          <div id="inspectTraceRouteSteps" class="flex flex-wrap items-center gap-1.5 sm:gap-2 text-xs font-mono">
+            <!-- Populated dynamically by app.js -->
+            <span class="bg-cyan-950/80 text-cyan-300 border border-cyan-500/40 px-2 py-1 rounded-lg flex items-center gap-1 font-bold">
+              <i class="fa-solid fa-globe"></i> 4 WAN (WAN: 192.168.113, WAN1: 100.113.241.46, WAN2: 192.168.250.2, WAN3: 192.168.1.2)
+            </span>
+            <i class="fa-solid fa-arrow-right text-[10px] text-cyan-500"></i>
+            <span class="bg-slate-800 text-slate-200 border border-slate-700 px-2 py-1 rounded-lg">
+              Gateway-LB (10.255.0.1:LAN0)
+            </span>
+            <i class="fa-solid fa-arrow-right text-[10px] text-cyan-500"></i>
+            <span class="bg-indigo-950 text-indigo-300 border border-indigo-700 px-2 py-1 rounded-lg">
+              Virtual device (MikroTik CHR:10.27.42.1)
+            </span>
+            <i class="fa-solid fa-arrow-right text-[10px] text-cyan-500"></i>
+            <span class="bg-slate-800 text-slate-200 border border-slate-700 px-2 py-1 rounded-lg">
+              012-SW-Rack (Port G10)
+            </span>
+            <i class="fa-solid fa-arrow-right text-[10px] text-cyan-500"></i>
+            <span class="bg-slate-800 text-slate-200 border border-slate-700 px-2 py-1 rounded-lg">
+              PerpusNew-DTB ➔ SW-Perpus
+            </span>
+            <i class="fa-solid fa-arrow-right text-[10px] text-cyan-500"></i>
+            <span class="bg-emerald-950 text-emerald-300 border border-emerald-500/50 px-2 py-1 rounded-lg font-bold">
+              GD-BEM01 (10.0.2.10)
+            </span>
+          </div>
+
+          <!-- KETERANGAN BUKTI 4 ISP DITERIMA PERANGKAT INI -->
+          <div class="bg-slate-950/70 border border-slate-800 rounded-xl p-3 text-xs text-slate-300 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div class="space-y-1">
+              <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Akses Multi-WAN (4 ISP):</div>
+              <div class="text-emerald-400 font-mono text-[11px] flex items-center gap-1">
+                <i class="fa-solid fa-check-double"></i> Menerima trafik 4 WAN
+              </div>
+              <div class="text-[10px] text-slate-400">PCC via Gateway 10.27.42.1</div>
+            </div>
+
+            <div class="space-y-1">
+              <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Status Akses Internet:</div>
+              <div id="inspectInternetStatus" class="text-emerald-400 font-mono text-[11px] flex items-center gap-1 font-bold">
+                <i class="fa-solid fa-circle text-[8px] animate-pulse"></i> <span>ONLINE (Terhubung)</span>
+              </div>
+              <div id="inspectInternetRoute" class="text-[10px] text-cyan-300 font-mono truncate">Jalur: WAN1 (Indibiz)</div>
+            </div>
+
+            <div class="space-y-1">
+              <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Uplink & Downlink Port:</div>
+              <div class="text-slate-200 font-mono text-[11px] truncate" id="inspectPortsInfo">Uplink: SW-Perpus [Port 2]</div>
+              <div class="text-[10px] text-slate-400">Media: UTP Cat6 Gigabit</div>
+            </div>
+
+            <div class="space-y-1">
+              <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Kinerja Realtime:</div>
+              <div class="flex items-center gap-3 text-[11px] font-mono">
+                <span class="text-slate-300">RTT: <strong id="inspectRtt" class="text-emerald-400">1.2ms</strong></span>
+                <span class="text-slate-300">Loss: <strong id="inspectLoss" class="text-emerald-400">0.0%</strong></span>
+                <span class="text-slate-300">Klien: <strong id="inspectClients" class="text-indigo-400">28</strong></span>
+              </div>
+              <div class="text-[10px] text-slate-400" id="inspectBandwidth">Throughput: Rx 14.2 / Tx 3.8 Mbps</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================================================================= -->
+      <!-- KANVAS DIAGRAM TOPOLOGI POHON LENGKAP (SESUAI GAMBAR ASLI PENGGUNA) -->
+      <!-- ================================================================= -->
+      <section class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xl">
+        <div class="flex items-center justify-between mb-4 pb-2 border-b border-slate-800">
+          <div class="flex items-center gap-2">
+            <span class="w-3 h-3 rounded-full bg-emerald-500"></span>
+            <h3 class="text-sm font-bold text-white uppercase tracking-wider">Diagram Pohon Fisik & Logika Topologi</h3>
+          </div>
+          <div class="flex items-center gap-4 text-xs font-mono text-slate-400">
+            <span class="flex items-center gap-1.5"><span class="w-3 h-0.5 bg-emerald-500 inline-block"></span> Kabel UTP/FO</span>
+            <span class="flex items-center gap-1.5"><span class="w-3 h-0.5 border-b border-emerald-500 border-dashed inline-block"></span> 5G Wireless Mesh</span>
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-cyan-400 inline-block"></span> Jalur Aktif Terpilih</span>
+          </div>
+        </div>
+
+        <!-- CANVAS OVERFLOW HORIZONTAL AGAR RAPI DI SEMUA UKURAN LAYAR -->
+        <div class="topo-canvas overflow-x-auto rounded-xl p-4 sm:p-8 border border-slate-800/80">
+          <div class="min-w-[1020px] max-w-[1300px] mx-auto flex flex-col items-center select-none">
+            
+            <!-- 1. TINGKAT TERATAS: 4 ISP GLOBE ICONS -->
+            <div class="grid grid-cols-4 gap-12 sm:gap-16 w-full max-w-xl text-center mb-1">
+              <!-- WAN 3: Starlite -->
+              <div class="flex flex-col items-center">
+                <div class="w-12 h-12 rounded-full bg-cyan-950/80 border-2 border-cyan-400 flex items-center justify-center text-cyan-300 text-xl shadow-lg shadow-cyan-500/20 hover:scale-110 transition">
+                  <i class="fa-solid fa-globe"></i>
+                </div>
+                <div class="mt-1 text-[11px] font-bold text-cyan-300">WAN3 (Starlite)</div>
+                <div class="text-[10px] text-cyan-200 font-mono font-bold bg-cyan-950/70 border border-cyan-500/30 px-2 py-0.5 rounded mt-0.5 shadow-sm whitespace-nowrap">IP: 192.168.1.2</div>
+              </div>
+
+              <!-- WAN 2: Starlink -->
+              <div class="flex flex-col items-center">
+                <div class="w-12 h-12 rounded-full bg-purple-950/80 border-2 border-purple-400 flex items-center justify-center text-purple-300 text-xl shadow-lg shadow-purple-500/20 hover:scale-110 transition">
+                  <i class="fa-solid fa-satellite"></i>
+                </div>
+                <div class="mt-1 text-[11px] font-bold text-purple-300">WAN2 (Starlink)</div>
+                <div class="text-[10px] text-purple-200 font-mono font-bold bg-purple-950/70 border border-purple-500/30 px-2 py-0.5 rounded mt-0.5 shadow-sm whitespace-nowrap">IP: 192.168.250.2</div>
+              </div>
+
+              <!-- WAN 1: Indibiz -->
+              <div class="flex flex-col items-center">
+                <div class="w-12 h-12 rounded-full bg-red-950/80 border-2 border-red-400 flex items-center justify-center text-red-300 text-xl shadow-lg shadow-red-500/20 hover:scale-110 transition">
+                  <i class="fa-solid fa-building"></i>
+                </div>
+                <div class="mt-1 text-[11px] font-bold text-red-300">WAN1 (Indibiz)</div>
+                <div class="text-[10px] text-red-200 font-mono font-bold bg-red-950/70 border border-red-500/30 px-2 py-0.5 rounded mt-0.5 shadow-sm whitespace-nowrap">IP: 100.113.241.46</div>
+              </div>
+
+              <!-- WAN: Citra -->
+              <div class="flex flex-col items-center">
+                <div class="w-12 h-12 rounded-full bg-sky-950/80 border-2 border-sky-400 flex items-center justify-center text-sky-300 text-xl shadow-lg shadow-sky-500/20 hover:scale-110 transition">
+                  <i class="fa-solid fa-network-wired"></i>
+                </div>
+                <div class="mt-1 text-[11px] font-bold text-sky-300">WAN (Citra)</div>
+                <div class="text-[10px] text-sky-200 font-mono font-bold bg-sky-950/70 border border-sky-500/30 px-2 py-0.5 rounded mt-0.5 shadow-sm whitespace-nowrap">IP: 192.168.113</div>
+              </div>
+            </div>
+
+            <!-- KABEL KE GATEWAY-LB DENGAN PORT TAG & TEKS ALAMAT IP -->
+            <div class="grid grid-cols-4 gap-12 sm:gap-16 w-full max-w-xl text-center">
+              <div class="flex flex-col items-center">
+                <div class="topo-line-v h-3"></div>
+                <span class="port-tag">@WAN3</span>
+                <span class="text-[9px] font-mono font-bold text-cyan-300 bg-slate-900/95 border border-cyan-500/40 px-1.5 py-0.5 rounded shadow mt-1 whitespace-nowrap">IP: 192.168.1.2</span>
+                <div class="topo-line-v h-3"></div>
+              </div>
+              <div class="flex flex-col items-center">
+                <div class="topo-line-v h-3"></div>
+                <span class="port-tag">@WAN2</span>
+                <span class="text-[9px] font-mono font-bold text-purple-300 bg-slate-900/95 border border-purple-500/40 px-1.5 py-0.5 rounded shadow mt-1 whitespace-nowrap">IP: 192.168.250.2</span>
+                <div class="topo-line-v h-3"></div>
+              </div>
+              <div class="flex flex-col items-center">
+                <div class="topo-line-v h-3"></div>
+                <span class="port-tag">@WAN1</span>
+                <span class="text-[9px] font-mono font-bold text-red-300 bg-slate-900/95 border border-red-500/40 px-1.5 py-0.5 rounded shadow mt-1 whitespace-nowrap">IP: 100.113.241.46</span>
+                <div class="topo-line-v h-3"></div>
+              </div>
+              <div class="flex flex-col items-center">
+                <div class="topo-line-v h-3"></div>
+                <span class="port-tag">@WAN</span>
+                <span class="text-[9px] font-mono font-bold text-sky-300 bg-slate-900/95 border border-sky-500/40 px-1.5 py-0.5 rounded shadow mt-1 whitespace-nowrap">IP: 192.168.113</span>
+                <div class="topo-line-v h-3"></div>
+              </div>
+            </div>
+
+            <!-- 2. GATEWAY-LB (RUIJIE RG1510XS) -->
+            <div class="topo-node w-84 sm:w-96 rounded-xl p-3 shadow-md flex items-center justify-between border-slate-700 bg-slate-900/90" data-node-id="gateway-lb">
+              <div class="flex items-center gap-2.5">
+                <span class="badge-dev-type badge-dev-router">R</span>
+                <div>
+                  <div class="text-xs font-bold text-white flex items-center gap-1.5">
+                    <span>Gateway-LB</span>
+                    <span class="text-[9px] bg-emerald-950 text-emerald-300 px-1.5 py-0.2 rounded border border-emerald-800">4-WAN LB</span>
+                  </div>
+                  <div class="text-[10px] text-slate-400 font-mono">Ruijie RG1510XS Multi-WAN</div>
+                  <div class="text-[10px] text-emerald-400 font-mono">IP LAN: 10.255.0.1/30</div>
+                  <div class="text-[9px] font-mono mt-1.5 flex flex-wrap gap-1">
+                    <span class="bg-slate-800/90 px-1.5 py-0.5 rounded border border-sky-500/30 text-sky-300">WAN: 192.168.113</span>
+                    <span class="bg-slate-800/90 px-1.5 py-0.5 rounded border border-red-500/30 text-red-300">WAN1: 100.113.241.46</span>
+                    <span class="bg-slate-800/90 px-1.5 py-0.5 rounded border border-purple-500/30 text-purple-300">WAN2: 192.168.250.2</span>
+                    <span class="bg-slate-800/90 px-1.5 py-0.5 rounded border border-cyan-500/30 text-cyan-300">WAN3: 192.168.1.2</span>
+                  </div>
+                </div>
+              </div>
+              <div class="text-right">
+                <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800">ACTIVE</span>
+                <div class="text-[9px] text-slate-400 mt-1 font-mono">LAN0 Downlink</div>
+              </div>
+            </div>
+
+            <!-- KONEKSI KABEL: GATEWAY-LB [LAN0] ➔ VIRTUAL DEVICE [UPLINK PORT] -->
+            <div class="flex flex-col items-center my-0.5">
+              <div class="topo-line-v h-4"></div>
+              <span class="port-tag">LAN0</span>
+              <div class="topo-line-v h-5"></div>
+              <span class="port-tag">Uplink Port</span>
+              <div class="topo-line-v h-4"></div>
+            </div>
+
+            <!-- 3. VIRTUAL DEVICE (MIKROTIK CHR GATEWAY & PCC LOAD BALANCER) -->
+            <div class="topo-node w-80 rounded-xl p-3 shadow-md flex items-center justify-between border-indigo-500/40 bg-slate-900/90" data-node-id="virtual-device">
+              <div class="flex items-center gap-2.5">
+                <span class="badge-dev-type badge-dev-router">R</span>
+                <div>
+                  <div class="text-xs font-bold text-white flex items-center gap-1.5">
+                    <span>Virtual device</span>
+                    <span class="text-[9px] bg-indigo-950 text-indigo-300 px-1.5 py-0.2 rounded border border-indigo-800">Core</span>
+                  </div>
+                  <div class="text-[10px] text-slate-400 font-mono">MikroTik CHR Gateway (PCC 4-WAN)</div>
+                  <div class="text-[10px] text-cyan-300 font-mono font-bold">IP: 10.27.42.1</div>
+                </div>
+              </div>
+              <div class="text-right">
+                <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800">PCC 4-WAN</span>
+                <div class="text-[9px] text-slate-400 mt-1 font-mono">eth6-hab1</div>
+              </div>
+            </div>
+
+            <!-- KONEKSI KABEL: VIRTUAL DEVICE [eth6-hab1] ➔ 012-SW-RACK [G11] -->
+            <div class="flex flex-col items-center my-0.5">
+              <div class="topo-line-v h-4"></div>
+              <span class="port-tag">eth6-hab1</span>
+              <div class="topo-line-v h-5"></div>
+              <span class="port-tag">G11</span>
+              <div class="topo-line-v h-4"></div>
+            </div>
+
+            <!-- 4. CORE SWITCH: 012-SW-RACK (RUIJIE NBS5100-24GT4SFP-V2) -->
+            <div class="topo-node w-80 rounded-xl p-3 shadow-md flex items-center justify-between border-cyan-500/40 bg-slate-900/90" data-node-id="sw-rack">
+              <div class="flex items-center gap-2.5">
+                <span class="badge-dev-type badge-dev-switch">SW</span>
+                <div>
+                  <div class="text-xs font-bold text-white flex items-center gap-1.5">
+                    <span>012-SW-Rack</span>
+                    <span class="text-[9px] bg-cyan-950 text-cyan-300 px-1.5 py-0.2 rounded border border-cyan-800">Rack Core</span>
+                  </div>
+                  <div class="text-[10px] text-slate-400 font-mono">NBS5100-24GT4SFP-V2</div>
+                  <div class="text-[10px] text-cyan-300 font-mono font-bold">IP: 10.0.0.2/24</div>
+                </div>
+              </div>
+              <div class="text-right">
+                <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800">G10 | G17 | G20</span>
+                <div class="text-[9px] text-slate-400 mt-1 font-mono">24-Port GbE</div>
+              </div>
+            </div>
+
+            <!-- KABEL DISTRIBUSI CORE SWITCH KE 3 CABANG UTAMA -->
+            <div class="w-full flex flex-col items-center mt-0.5 mb-1">
+              <!-- Garis vertikal pendek keluar dari 012-SW-Rack -->
+              <div class="topo-line-v h-4"></div>
+              
+              <!-- Garis horizontal membagi ke 3 Cabang -->
+              <div class="w-[84%] topo-line-h"></div>
+
+              <!-- 3 Port Tag Downlink -->
+              <div class="w-[84%] flex justify-between items-start">
+                <!-- Cabang 1: G10 -->
+                <div class="flex flex-col items-center">
+                  <div class="topo-line-v h-3"></div>
+                  <span class="port-tag">G10</span>
+                  <div class="topo-line-v h-4"></div>
+                  <span class="port-tag">bridge1-...</span>
+                  <div class="topo-line-v h-3"></div>
+                </div>
+
+                <!-- Cabang 2: G17 -->
+                <div class="flex flex-col items-center">
+                  <div class="topo-line-v h-3"></div>
+                  <span class="port-tag">G17</span>
+                  <div class="topo-line-v h-4"></div>
+                  <span class="port-tag">WAN</span>
+                  <div class="topo-line-v h-3"></div>
+                </div>
+
+                <!-- Cabang 3: G20 -->
+                <div class="flex flex-col items-center">
+                  <div class="topo-line-v h-3"></div>
+                  <span class="port-tag">G20</span>
+                  <div class="topo-line-v h-4"></div>
+                  <span class="port-tag">WAN</span>
+                  <div class="topo-line-v h-3"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- ============================================================= -->
+            <!-- 5. GRID 3 CABANG UTAMA (SESUAI GAMBAR ASLI KAMPUS UNUGHA)      -->
+            <!-- ============================================================= -->
+            <div class="grid grid-cols-3 gap-6 sm:gap-8 w-full items-start">
+
+              <!-- =========================================================== -->
+              <!-- CABANG 1 (KIRI): PERPUSTAKAAN & REKTORAT (VIA G10)          -->
+              <!-- =========================================================== -->
+              <div class="flex flex-col items-center space-y-2">
+                
+                <!-- NODE: PerpusNew-DTB -->
+                <div class="topo-node w-64 rounded-xl p-2.5 shadow-sm border-slate-700 bg-slate-900/90 text-center" data-node-id="perpus-dtb">
+                  <div class="flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-code-fork text-amber-400 text-xs"></i>
+                    <span class="text-xs font-bold text-white">PerpusNew-DTB</span>
+                  </div>
+                  <div class="text-[10px] text-slate-400 font-mono">Distribusi Perpus & Rektorat</div>
+                  <div class="text-[10px] text-emerald-400 font-mono">IP: 10.0.1.2/24</div>
+                </div>
+
+                <!-- Cabang dari PerpusNew-DTB ke SW-Perpus & SW-Rektorat -->
+                <div class="w-full flex flex-col items-center my-0.5">
+                  <div class="topo-line-v h-3"></div>
+                  <div class="w-[78%] topo-line-h"></div>
+                  <div class="w-[78%] flex justify-between items-start">
+                    <div class="flex flex-col items-center">
+                      <div class="topo-line-v h-2"></div>
+                      <span class="port-tag">Port1</span>
+                      <div class="topo-line-v h-3"></div>
+                      <span class="port-tag">Port 8</span>
+                      <div class="topo-line-v h-2"></div>
+                    </div>
+                    <div class="flex flex-col items-center">
+                      <div class="topo-line-v h-2"></div>
+                      <span class="port-tag">Port2</span>
+                      <div class="topo-line-v h-3"></div>
+                      <span class="port-tag">Port 8</span>
+                      <div class="topo-line-v h-2"></div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- DUA SUB-DISTRIBUSI: SW-PERPUS & SW-REKTORAT -->
+                <div class="w-full grid grid-cols-2 gap-3 items-start">
+                  
+                  <!-- SUB-CABANG 1A: SW-PERPUS & LINKSYS GEDUNG PERPUSTAKAAN -->
+                  <div class="flex flex-col items-center space-y-2">
+                    <!-- NODE: SW-Perpus -->
+                    <div class="topo-node w-full rounded-xl p-2 shadow-sm border-slate-700 bg-slate-900/90 text-center" data-node-id="sw-perpus">
+                      <div class="flex items-center justify-center gap-1.5">
+                        <span class="badge-dev-type badge-dev-switch text-[8px] h-4 w-5">SW</span>
+                        <span class="text-[11px] font-bold text-white">SW-Perpus</span>
+                      </div>
+                      <div class="text-[9px] text-slate-400 font-mono">ES208GC • IP: 10.0.2.1/24</div>
+                    </div>
+
+                    <!-- Konektor ke GD-BEM01 -->
+                    <div class="flex flex-col items-center">
+                      <div class="topo-line-v h-2"></div>
+                      <span class="port-tag">Port 2</span>
+                      <div class="topo-line-v h-3"></div>
+                      <span class="port-tag">WAN</span>
+                      <div class="topo-line-v h-2"></div>
+                    </div>
+
+                    <!-- ROUTER 1: GD-BEM01 (Linksys OpenWrt EA7500) -->
+                    <div class="topo-node w-full rounded-xl p-2 shadow-sm border-slate-700 bg-slate-900/90 text-center cursor-pointer hover:border-cyan-400" data-node-id="ea7500-01">
+                      <div class="flex items-center justify-between pb-1 border-b border-slate-800">
+                        <span class="badge-dev-type badge-dev-switch text-[8px] h-4 w-5">SW</span>
+                        <span class="text-[8px] font-mono px-1 rounded bg-emerald-950 text-emerald-300">4-ISP</span>
+                      </div>
+                      <div class="text-xs font-bold text-white mt-1">GD-BEM01</div>
+                      <div class="text-[9px] text-cyan-400 font-mono">EA6200 [Tambah Manual]</div>
+                      <div class="text-[10px] text-amber-300 font-mono font-bold mt-0.5">10.0.2.10/24</div>
+                    </div>
+
+                    <!-- Konektor ke Perpus-Atas -->
+                    <div class="flex flex-col items-center">
+                      <div class="topo-line-v h-2"></div>
+                      <span class="port-tag">Port2</span>
+                      <div class="topo-line-v h-3"></div>
+                      <span class="port-tag">WAN</span>
+                      <div class="topo-line-v h-2"></div>
+                    </div>
+
+                    <!-- ROUTER 2: Perpus-Atas (Linksys OpenWrt EA7500) -->
+                    <div class="topo-node w-full rounded-xl p-2 shadow-sm border-slate-700 bg-slate-900/90 text-center cursor-pointer hover:border-cyan-400" data-node-id="ea7500-02">
+                      <div class="flex items-center justify-between pb-1 border-b border-slate-800">
+                        <span class="badge-dev-type badge-dev-switch text-[8px] h-4 w-5">SW</span>
+                        <span class="text-[8px] font-mono px-1 rounded bg-emerald-950 text-emerald-300">4-ISP</span>
+                      </div>
+                      <div class="text-xs font-bold text-white mt-1">Perpus-Atas</div>
+                      <div class="text-[9px] text-cyan-400 font-mono">EA6200 [Tambah Manual]</div>
+                      <div class="text-[10px] text-amber-300 font-mono font-bold mt-0.5">10.27.22.45/24</div>
+                    </div>
+                  </div>
+
+                  <!-- SUB-CABANG 1B: SW-REKTORAT & ROUTER BIRO/FAKULTAS -->
+                  <div class="flex flex-col items-center space-y-2">
+                    <!-- NODE: SW-Rektorat -->
+                    <div class="topo-node w-full rounded-xl p-2 shadow-sm border-slate-700 bg-slate-900/90 text-center" data-node-id="sw-rektorat">
+                      <div class="flex items-center justify-center gap-1.5">
+                        <span class="badge-dev-type badge-dev-switch text-[8px] h-4 w-5">SW</span>
+                        <span class="text-[11px] font-bold text-white">SW-Rektorat</span>
+                      </div>
+                      <div class="text-[9px] text-slate-400 font-mono">ES208GC • IP: 10.0.3.1/24</div>
+                    </div>
+
+                    <!-- 4 ROUTER DI SW-REKTORAT: Biro1-B, Biro1A, Biro1, AP-Rektorat -->
+                    <div class="w-full flex flex-col space-y-2.5 pt-1">
+                      
+                      <!-- ROUTER 3: Biro1-B -->
+                      <div class="flex flex-col items-center">
+                        <span class="port-tag text-[8px] py-0.5">Port 2 ➔ WAN</span>
+                        <div class="topo-line-v h-2"></div>
+                        <div class="topo-node w-full rounded-lg p-1.5 border-slate-700 bg-slate-900/90 text-center cursor-pointer hover:border-cyan-400" data-node-id="ea7500-03">
+                          <div class="flex items-center justify-between text-[9px]">
+                            <span class="badge-dev-type badge-dev-router text-[7px] h-3.5 w-4">R</span>
+                            <span class="font-bold text-white">Biro1-B</span>
+                            <span class="text-[8px] text-emerald-400 font-mono">4-ISP</span>
+                          </div>
+                          <div class="text-[8px] text-slate-400">EW1200G-PRO</div>
+                          <div class="text-[9px] text-amber-300 font-mono font-bold">10.0.3.10/24</div>
+                        </div>
+                      </div>
+
+                      <!-- ROUTER 4: Biro1A -->
+                      <div class="flex flex-col items-center">
+                        <span class="port-tag text-[8px] py-0.5">Port 5 ➔ WAN</span>
+                        <div class="topo-line-v h-2"></div>
+                        <div class="topo-node w-full rounded-lg p-1.5 border-slate-700 bg-slate-900/90 text-center cursor-pointer hover:border-cyan-400" data-node-id="ea7500-04">
+                          <div class="flex items-center justify-between text-[9px]">
+                            <span class="badge-dev-type badge-dev-router text-[7px] h-3.5 w-4">R</span>
+                            <span class="font-bold text-white">Biro1A</span>
+                            <span class="text-[8px] text-emerald-400 font-mono">4-ISP</span>
+                          </div>
+                          <div class="text-[8px] text-slate-400">EW1200G-PRO</div>
+                          <div class="text-[9px] text-amber-300 font-mono font-bold">10.0.3.11/24</div>
+                        </div>
+                      </div>
+
+                      <!-- ROUTER 5: Biro1 & ROUTER 6: FMIKOM -->
+                      <div class="flex flex-col items-center">
+                        <span class="port-tag text-[8px] py-0.5">Port 6 ➔ WAN</span>
+                        <div class="topo-line-v h-2"></div>
+                        <div class="topo-node w-full rounded-lg p-1.5 border-slate-700 bg-slate-900/90 text-center cursor-pointer hover:border-cyan-400" data-node-id="ea7500-05">
+                          <div class="flex items-center justify-between text-[9px]">
+                            <span class="badge-dev-type badge-dev-switch text-[7px] h-3.5 w-4">SW</span>
+                            <span class="font-bold text-white">Biro1</span>
+                            <span class="text-[8px] text-emerald-400 font-mono">4-ISP</span>
+                          </div>
+                          <div class="text-[8px] text-cyan-400">EA7200 [Tambah Manual]</div>
+                          <div class="text-[9px] text-amber-300 font-mono font-bold">10.27.23.23/24</div>
+                        </div>
+
+                        <!-- Konektor ke FMIKOM -->
+                        <div class="topo-line-v h-2"></div>
+                        <span class="port-tag text-[8px] py-0.5">? / LAN ➔ WAN</span>
+                        <div class="topo-line-v h-2"></div>
+
+                        <div class="topo-node w-full rounded-lg p-1.5 border-slate-700 bg-slate-900/90 text-center cursor-pointer hover:border-cyan-400" data-node-id="ea7500-06">
+                          <div class="flex items-center justify-between text-[9px]">
+                            <span class="badge-dev-type badge-dev-switch text-[7px] h-3.5 w-4">SW</span>
+                            <span class="font-bold text-white">FMIKOM</span>
+                            <span class="text-[8px] text-emerald-400 font-mono">4-ISP</span>
+                          </div>
+                          <div class="text-[8px] text-cyan-400">EA6200 [Tambah Manual]</div>
+                          <div class="text-[9px] text-amber-300 font-mono font-bold">10.27.23.17/24</div>
+                        </div>
+                      </div>
+
+                      <!-- ROUTER 7: AP-Rektorat -->
+                      <div class="flex flex-col items-center">
+                        <span class="port-tag text-[8px] py-0.5">Port 7 ➔ WAN</span>
+                        <div class="topo-line-v h-2"></div>
+                        <div class="topo-node w-full rounded-lg p-1.5 border-slate-700 bg-slate-900/90 text-center cursor-pointer hover:border-cyan-400" data-node-id="ea7500-07">
+                          <div class="flex items-center justify-between text-[9px]">
+                            <span class="badge-dev-type badge-dev-router text-[7px] h-3.5 w-4">R</span>
+                            <span class="font-bold text-white">AP-Rektorat</span>
+                            <span class="text-[8px] text-emerald-400 font-mono">4-ISP</span>
+                          </div>
+                          <div class="text-[8px] text-slate-400">EW1200G-PRO</div>
+                          <div class="text-[9px] text-amber-300 font-mono font-bold">10.0.3.30/24</div>
+                        </div>
+                      </div>
+
+                    </div>
+                  </div>
+
+                </div>
+
+              </div>
+
+              <!-- =========================================================== -->
+              <!-- CABANG 2 (TENGAH): GEDUNG D & KELAS A5 - A8 (VIA G17)       -->
+              <!-- =========================================================== -->
+              <div class="flex flex-col items-center space-y-2">
+                
+                <!-- ROUTER 8: GD1-LT1 (Gedung D Lt 1) -->
+                <div class="topo-node w-64 rounded-xl p-2.5 shadow-sm border-slate-700 bg-slate-900/90 text-center cursor-pointer hover:border-cyan-400" data-node-id="ea7500-08">
+                  <div class="flex items-center justify-between pb-1 border-b border-slate-800">
+                    <span class="badge-dev-type badge-dev-switch text-[8px] h-4 w-5">SW</span>
+                    <span class="text-xs font-bold text-white">GD1-LT1</span>
+                    <span class="text-[8px] font-mono px-1.5 rounded bg-emerald-950 text-emerald-300">4-ISP</span>
+                  </div>
+                  <div class="text-[10px] text-cyan-400 font-mono mt-1">EA6200 [Tambah Manual]</div>
+                  <div class="text-[10px] text-amber-300 font-mono font-bold">IP: 10.27.51.12/24</div>
+                </div>
+
+                <!-- Konektor ke A5 -->
+                <div class="flex flex-col items-center">
+                  <div class="topo-line-v h-3"></div>
+                  <span class="port-tag">port4</span>
+                  <div class="topo-line-v h-3"></div>
+                  <span class="port-tag">WAN</span>
+                  <div class="topo-line-v h-2"></div>
+                </div>
+
+                <!-- ROUTER 9: A5 (Ruang Kelas A-5) -->
+                <div class="topo-node w-64 rounded-xl p-2.5 shadow-sm border-slate-700 bg-slate-900/90 text-center cursor-pointer hover:border-cyan-400" data-node-id="ea7500-09">
+                  <div class="flex items-center justify-between pb-1 border-b border-slate-800">
+                    <span class="badge-dev-type badge-dev-router text-[8px] h-4 w-5">R</span>
+                    <span class="text-xs font-bold text-white">A5</span>
+                    <span class="text-[8px] font-mono px-1.5 rounded bg-emerald-950 text-emerald-300">4-ISP</span>
+                  </div>
+                  <div class="text-[10px] text-slate-400 font-mono mt-1">EW1200G-PRO (Mesh Master)</div>
+                  <div class="text-[10px] text-amber-300 font-mono font-bold">IP: 10.0.4.5/24</div>
+                </div>
+
+                <!-- Konektor Wireless 5G Mesh ke A6 -->
+                <div class="flex flex-col items-center">
+                  <div class="topo-line-v topo-line-dashed h-4"></div>
+                  <span class="port-tag text-emerald-400 border-dashed"><i class="fa-solid fa-wifi text-[8px]"></i> 5G Mesh</span>
+                  <div class="topo-line-v topo-line-dashed h-3"></div>
+                  <span class="port-tag">WAN</span>
+                  <div class="topo-line-v topo-line-dashed h-2"></div>
+                </div>
+
+                <!-- ROUTER 10: A6 (Ruang Kelas A-6) -->
+                <div class="topo-node w-64 rounded-xl p-2.5 shadow-sm border-slate-700 bg-slate-900/90 text-center cursor-pointer hover:border-cyan-400" data-node-id="ea7500-10">
+                  <div class="flex items-center justify-between pb-1 border-b border-slate-800">
+                    <span class="badge-dev-type badge-dev-router text-[8px] h-4 w-5">R</span>
+                    <span class="text-xs font-bold text-white">A6</span>
+                    <span class="text-[8px] font-mono px-1.5 rounded bg-emerald-950 text-emerald-300">4-ISP</span>
+                  </div>
+                  <div class="text-[10px] text-slate-400 font-mono mt-1">EW1200G-PRO</div>
+                  <div class="text-[10px] text-amber-300 font-mono font-bold">IP: 10.0.4.6/24</div>
+                </div>
+
+                <!-- Konektor Wireless 5G Mesh ke A7 -->
+                <div class="flex flex-col items-center">
+                  <div class="topo-line-v topo-line-dashed h-4"></div>
+                  <span class="port-tag text-emerald-400 border-dashed"><i class="fa-solid fa-wifi text-[8px]"></i> 5G Mesh</span>
+                  <div class="topo-line-v topo-line-dashed h-3"></div>
+                  <span class="port-tag">WAN</span>
+                  <div class="topo-line-v topo-line-dashed h-2"></div>
+                </div>
+
+                <!-- ROUTER 11: A7 (Ruang Kelas A-7) -->
+                <div class="topo-node w-64 rounded-xl p-2.5 shadow-sm border-slate-700 bg-slate-900/90 text-center cursor-pointer hover:border-cyan-400" data-node-id="ea7500-11">
+                  <div class="flex items-center justify-between pb-1 border-b border-slate-800">
+                    <span class="badge-dev-type badge-dev-router text-[8px] h-4 w-5">R</span>
+                    <span class="text-xs font-bold text-white">A7</span>
+                    <span class="text-[8px] font-mono px-1.5 rounded bg-emerald-950 text-emerald-300">4-ISP</span>
+                  </div>
+                  <div class="text-[10px] text-slate-400 font-mono mt-1">EW1200G-PRO</div>
+                  <div class="text-[10px] text-amber-300 font-mono font-bold">IP: 10.0.4.7/24</div>
+                </div>
+
+                <!-- Konektor Wireless 5G Mesh ke A8 -->
+                <div class="flex flex-col items-center">
+                  <div class="topo-line-v topo-line-dashed h-4"></div>
+                  <span class="port-tag text-emerald-400 border-dashed"><i class="fa-solid fa-wifi text-[8px]"></i> 5G Mesh</span>
+                  <div class="topo-line-v topo-line-dashed h-3"></div>
+                  <span class="port-tag">WAN</span>
+                  <div class="topo-line-v topo-line-dashed h-2"></div>
+                </div>
+
+                <!-- ROUTER 12: A8 (Ruang Kelas A-8) -->
+                <div class="topo-node w-64 rounded-xl p-2.5 shadow-sm border-slate-700 bg-slate-900/90 text-center cursor-pointer hover:border-cyan-400" data-node-id="ea7500-12">
+                  <div class="flex items-center justify-between pb-1 border-b border-slate-800">
+                    <span class="badge-dev-type badge-dev-router text-[8px] h-4 w-5">R</span>
+                    <span class="text-xs font-bold text-white">A8</span>
+                    <span class="text-[8px] font-mono px-1.5 rounded bg-emerald-950 text-emerald-300">4-ISP</span>
+                  </div>
+                  <div class="text-[10px] text-slate-400 font-mono mt-1">EW1200G-PRO</div>
+                  <div class="text-[10px] text-amber-300 font-mono font-bold">IP: 10.0.4.8/24</div>
+                </div>
+
+              </div>
+
+              <!-- =========================================================== -->
+              <!-- CABANG 3 (KANAN): LAB KOMPUTER & GEDUNG H (VIA G20)         -->
+              <!-- =========================================================== -->
+              <div class="flex flex-col items-center space-y-2">
+                
+                <!-- ROUTER 13: LabKOM (Switch Distribusi Lab) -->
+                <div class="topo-node w-64 rounded-xl p-2.5 shadow-sm border-slate-700 bg-slate-900/90 text-center cursor-pointer hover:border-cyan-400" data-node-id="ea7500-13">
+                  <div class="flex items-center justify-between pb-1 border-b border-slate-800">
+                    <span class="badge-dev-type badge-dev-switch text-[8px] h-4 w-5">SW</span>
+                    <span class="text-xs font-bold text-white">LabKOM</span>
+                    <span class="text-[8px] font-mono px-1.5 rounded bg-emerald-950 text-emerald-300">4-ISP</span>
+                  </div>
+                  <div class="text-[10px] text-cyan-400 font-mono mt-1">Switch Tidak Terkelola [Tambah Manual]</div>
+                  <div class="text-[10px] text-amber-300 font-mono font-bold">IP: 10.27.41.12/24</div>
+                </div>
+
+                <!-- Konektor ke GH2-LT2 -->
+                <div class="flex flex-col items-center">
+                  <div class="topo-line-v h-3"></div>
+                  <span class="port-tag">LAN2</span>
+                  <div class="topo-line-v h-3"></div>
+                  <span class="port-tag">WAN</span>
+                  <div class="topo-line-v h-2"></div>
+                </div>
+
+                <!-- ROUTER 14: GH2-LT2 (Gedung H Lt 2) -->
+                <div class="topo-node w-64 rounded-xl p-2.5 shadow-sm border-slate-700 bg-slate-900/90 text-center cursor-pointer hover:border-cyan-400" data-node-id="ea7500-14">
+                  <div class="flex items-center justify-between pb-1 border-b border-slate-800">
+                    <span class="badge-dev-type badge-dev-switch text-[8px] h-4 w-5">SW</span>
+                    <span class="text-xs font-bold text-white">GH2-LT2</span>
+                    <span class="text-[8px] font-mono px-1.5 rounded bg-emerald-950 text-emerald-300">4-ISP</span>
+                  </div>
+                  <div class="text-[10px] text-cyan-400 font-mono mt-1">EA6200 [Tambah Manual]</div>
+                  <div class="text-[10px] text-amber-300 font-mono font-bold">IP: 10.27.43.81/24</div>
+                </div>
+
+                <!-- Cabang dari GH2-LT2 ke GH2-LT3 & GH-RDown -->
+                <div class="w-full flex flex-col items-center my-0.5">
+                  <div class="topo-line-v h-3"></div>
+                  <div class="w-[78%] topo-line-h"></div>
+                  <div class="w-[78%] flex justify-between items-start">
+                    <div class="flex flex-col items-center">
+                      <div class="topo-line-v h-2"></div>
+                      <span class="port-tag">LAN3</span>
+                      <div class="topo-line-v h-3"></div>
+                      <span class="port-tag">WAN</span>
+                      <div class="topo-line-v h-2"></div>
+                    </div>
+                    <div class="flex flex-col items-center">
+                      <div class="topo-line-v h-2"></div>
+                      <span class="port-tag">Lan2</span>
+                      <div class="topo-line-v h-3"></div>
+                      <span class="port-tag">WAN</span>
+                      <div class="topo-line-v h-2"></div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- DUA ROUTER GEDUNG H: GH2-LT3 & GH-RDown -->
+                <div class="w-full grid grid-cols-2 gap-3 items-start">
+                  
+                  <!-- ROUTER 15: GH2-LT3 -->
+                  <div class="topo-node w-full rounded-xl p-2 shadow-sm border-slate-700 bg-slate-900/90 text-center cursor-pointer hover:border-cyan-400" data-node-id="ea7500-15">
+                    <div class="flex items-center justify-between pb-1 border-b border-slate-800">
+                      <span class="badge-dev-type badge-dev-switch text-[8px] h-4 w-5">SW</span>
+                      <span class="text-[8px] font-mono px-1 rounded bg-emerald-950 text-emerald-300">4-ISP</span>
+                    </div>
+                    <div class="text-xs font-bold text-white mt-1">GH2-LT3</div>
+                    <div class="text-[9px] text-cyan-400 font-mono">EA6200 [Tambah...]</div>
+                    <div class="text-[10px] text-amber-300 font-mono font-bold mt-0.5">10.0.5.30/24</div>
+                  </div>
+
+                  <!-- ROUTER 16: GH2-RDown -->
+                  <div class="topo-node w-full rounded-xl p-2 shadow-sm border-slate-700 bg-slate-900/90 text-center cursor-pointer hover:border-cyan-400" data-node-id="ea7500-16">
+                    <div class="flex items-center justify-between pb-1 border-b border-slate-800">
+                      <span class="badge-dev-type badge-dev-switch text-[8px] h-4 w-5">SW</span>
+                      <span class="text-[8px] font-mono px-1 rounded bg-emerald-950 text-emerald-300">4-ISP</span>
+                    </div>
+                    <div class="text-xs font-bold text-white mt-1">GH2-RDown</div>
+                    <div class="text-[9px] text-cyan-400 font-mono">EA6200 [Tambah...]</div>
+                    <div class="text-[10px] text-amber-300 font-mono font-bold mt-0.5">10.27.43.80/24</div>
+                  </div>
+
+                </div>
+
+              </div>
+
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      <!-- 16 ROUTER LINKSYS EA7500 MONITORING GRID -->
+      <section class="bg-slate-900/90 border border-slate-800 rounded-xl p-4 sm:p-5 shadow-sm space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-800">
+          <div>
+            <h2 class="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+              <i class="fa-solid fa-router text-amber-400"></i>
+              <span>Monitoring 16 Router Linksys EA7500 (Gedung & Fakultas Kampus UNUGHA)</span>
+            </h2>
+            <p class="text-xs text-slate-400">Status konektivitas, IP, latensi uplink ke MikroTik, jumlah pengguna Wi-Fi aktif, dan skor kesehatan</p>
+          </div>
+          <!-- Filter search -->
+          <div class="flex items-center gap-2 w-full sm:w-auto">
+            <div class="relative flex-1 sm:flex-initial">
+              <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-xs text-slate-400"></i>
+              <input type="text" id="searchRouterInput" placeholder="Cari gedung / IP..." class="w-full sm:w-56 bg-slate-800 border border-slate-700 rounded-lg pl-8 pr-3 py-1.5 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-cyan-500">
+            </div>
+            <select id="filterRouterStatus" class="bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500">
+              <option value="ALL">Semua</option>
+              <option value="UP">Hanya UP</option>
+              <option value="ALERT">Ada Anomali</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Grid 16 Router Linksys EA7500 Cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-3.5" id="routerGridContainer">
+          <!-- Rendered dynamically by app.js -->
+        </div>
+      </section>
+
+    </div>
+
+    <!-- ================================================================== -->
+    <!-- VIEW 3: ADMIN (PANEL SIMULASI, BENCHMARK RPC VS REST, DATABASE MYSQL) -->
+    <!-- ================================================================== -->
+    <div id="view-admin" class="hidden space-y-6 transition-all duration-300">
+      
+      <!-- HEADER PENGATURAN -->
+      <div class="bg-gradient-to-r from-purple-950/40 via-slate-900 to-cyan-950/40 border border-purple-500/30 rounded-2xl p-4 sm:p-6 shadow-lg flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <div class="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-500/20 text-purple-300 border border-purple-500/30 mb-2">
+            <i class="fa-solid fa-gear"></i>
+            <span>Pengaturan & Kontrol Sistem NOC</span>
+          </div>
+          <h2 class="text-lg sm:text-xl font-bold text-white tracking-tight">Menu Pengaturan & Panel Kontrol NOC</h2>
+          <p class="text-xs text-slate-400 max-w-2xl">Kelola data router & AP jaringan, konfigurasi simulasi anomali, uji komparasi ilmiah RPC vs REST (Bab 4), dan monitoring database MySQL.</p>
+        </div>
+        <div class="flex items-center gap-2 text-xs font-mono bg-slate-900/80 px-3 py-2 rounded-xl border border-slate-800">
+          <i class="fa-solid fa-database text-cyan-400"></i>
+          <span class="text-slate-400">DB:</span>
+          <span class="text-cyan-300 font-bold">multi_wan_rpc_db</span>
+        </div>
+      </div>
+
+      <!-- GRID DUA KOLOM ADMIN: BENCHMARK & SIMULASI -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+        <!-- PANEL 1: UJI KOMPARASI ILMIAH RPC VS REST (UNTUK BAB 4 SKRIPSI) -->
+        <section class="bg-slate-900/90 border border-slate-800 rounded-xl p-5 shadow-sm space-y-4 flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div>
+                <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                  <i class="fa-solid fa-chart-line text-cyan-400"></i>
+                  <span>Uji Komparasi Kinerja: RPC vs REST</span>
+                </h3>
+                <p class="text-[11px] text-slate-400">Pengukuran empiris latensi transmisi, overhead kompresi, & throughput</p>
+              </div>
+              <span class="text-[10px] bg-cyan-950 text-cyan-300 border border-cyan-800 px-2 py-0.5 rounded font-mono">Bab 4 Data</span>
+            </div>
+
+            <!-- Kontrol Pengujian -->
+            <div class="mt-4 flex flex-wrap items-center gap-3 bg-slate-800/60 p-3 rounded-xl border border-slate-700/60 text-xs">
+              <label class="text-slate-300 font-medium">Jumlah Iterasi:</label>
+              <select id="benchmarkIterations" class="bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-slate-200">
+                <option value="30">30 Sampel (Cepat)</option>
+                <option value="50" selected>50 Sampel (Standar Skripsi)</option>
+                <option value="100">100 Sampel (Riset Presisi)</option>
+              </select>
+              <button id="startBenchmarkBtn" class="ml-auto bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold px-3.5 py-1.5 rounded-lg shadow-md transition flex items-center gap-1.5 text-xs">
+                <i class="fa-solid fa-play text-[10px]"></i>
+                <span>Jalankan Uji</span>
+              </button>
+            </div>
+
+            <!-- Loading Spinner Benchmark -->
+            <div id="benchmarkLoading" class="hidden text-center py-8 space-y-2">
+              <i class="fa-solid fa-circle-notch animate-spin text-cyan-400 text-2xl"></i>
+              <p class="text-xs text-slate-300">Menjalankan pengiriman telemetri via JSON-RPC 2.0 & REST HTTP POST...</p>
+            </div>
+
+            <!-- Hasil Benchmark Side-by-Side -->
+            <div id="benchmarkResultsArea" class="hidden mt-4 space-y-4">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                
+                <!-- Hasil RPC -->
+                <div class="bg-cyan-950/20 border border-cyan-500/30 rounded-xl p-3.5 space-y-2">
+                  <div class="flex items-center justify-between pb-1.5 border-b border-cyan-500/20">
+                    <span class="text-xs font-bold text-cyan-400">JSON-RPC 2.0</span>
+                    <span class="text-[9px] bg-cyan-500/20 text-cyan-300 px-1.5 py-0.5 rounded font-mono">Diusulkan</span>
+                  </div>
+                  <ul class="text-[11px] space-y-1.5 text-slate-300 font-mono">
+                    <li class="flex justify-between"><span>Rata-rata Latensi:</span> <strong id="rpcAvgLat" class="text-cyan-400">0.0 ms</strong></li>
+                    <li class="flex justify-between"><span>Min / Max:</span> <span id="rpcMinMaxLat" class="text-slate-300">0.0 / 0.0 ms</span></li>
+                    <li class="flex justify-between"><span>P95 Latensi:</span> <span id="rpcP95Lat" class="text-slate-300">0.0 ms</span></li>
+                    <li class="flex justify-between"><span>Throughput:</span> <strong id="rpcReqSec" class="text-emerald-400">0 req/s</strong></li>
+                    <li class="flex justify-between"><span>Ukuran Paket:</span> <span id="rpcBytes" class="text-slate-300">0 bytes</span></li>
+                  </ul>
+                </div>
+
+                <!-- Hasil REST -->
+                <div class="bg-slate-800/40 border border-slate-700 rounded-xl p-3.5 space-y-2">
+                  <div class="flex items-center justify-between pb-1.5 border-b border-slate-700">
+                    <span class="text-xs font-bold text-slate-400">HTTP REST Polling</span>
+                    <span class="text-[9px] bg-slate-700 text-slate-400 px-1.5 py-0.5 rounded font-mono">Konvensional</span>
+                  </div>
+                  <ul class="text-[11px] space-y-1.5 text-slate-300 font-mono">
+                    <li class="flex justify-between"><span>Rata-rata Latensi:</span> <strong id="restAvgLat" class="text-slate-300">0.0 ms</strong></li>
+                    <li class="flex justify-between"><span>Min / Max:</span> <span id="restMinMaxLat" class="text-slate-400">0.0 / 0.0 ms</span></li>
+                    <li class="flex justify-between"><span>P95 Latensi:</span> <span id="restP95Lat" class="text-slate-400">0.0 ms</span></li>
+                    <li class="flex justify-between"><span>Throughput:</span> <span id="restReqSec" class="text-slate-300">0 req/s</span></li>
+                    <li class="flex justify-between"><span>Ukuran Paket:</span> <span id="restBytes" class="text-slate-400">0 bytes</span></li>
+                  </ul>
+                </div>
+
+              </div>
+
+              <!-- Kesimpulan Analisis Ilmiah -->
+              <div class="bg-gradient-to-r from-emerald-950/40 to-cyan-950/40 border border-emerald-500/30 rounded-xl p-3.5 text-xs text-slate-200">
+                <div class="font-bold text-emerald-400 mb-1 flex items-center gap-1.5 text-[11px]">
+                  <i class="fa-solid fa-certificate"></i>
+                  <span>Kesimpulan Hasil Pengujian (Bab 4 Pembahasan)</span>
+                </div>
+                <p id="benchmarkConclusionText" class="text-slate-300 text-[11px] leading-relaxed">
+                  Pilih iterasi dan klik "Jalankan Uji" untuk mengukur efisiensi RPC terhadap REST.
+                </p>
+              </div>
+            </div>
+          </div>
+          
+          <div class="text-[10px] text-slate-500 pt-3 border-t border-slate-800/80 flex items-center justify-between">
+            <span>Tersimpan otomatis ke tabel MySQL: <code>benchmark_history</code></span>
+            <i class="fa-solid fa-server"></i>
+          </div>
+        </section>
+
+        <!-- PANEL 2: INJEKSI SKENARIO GANGGUAN JARINGAN (SIMULASI SIDANG SKRIPSI) -->
+        <section class="bg-slate-900/90 border border-slate-800 rounded-xl p-5 shadow-sm space-y-4 flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div>
+                <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                  <i class="fa-solid fa-flask text-purple-400"></i>
+                  <span>Injeksi Skenario Anomali (Demonstrasi Sidang)</span>
+                </h3>
+                <p class="text-[11px] text-slate-400">Pilih skenario gangguan untuk menunjukkan kehandalan deteksi dini anomali</p>
+              </div>
+              <span class="text-[10px] bg-purple-950 text-purple-300 border border-purple-800 px-2 py-0.5 rounded font-mono">Demo Mode</span>
+            </div>
+
+            <!-- List 6 Skenario Interaktif -->
+            <div class="mt-4 space-y-2">
+              <button class="scenario-btn w-full bg-slate-800/80 hover:bg-slate-800 border border-slate-700/80 hover:border-emerald-500/50 p-2.5 rounded-xl text-left flex items-start gap-3 transition" data-scenario="NORMAL">
+                <div class="p-2 bg-emerald-500/20 text-emerald-400 rounded-lg flex-shrink-0"><i class="fa-solid fa-circle-check"></i></div>
+                <div class="min-w-0">
+                  <div class="text-xs font-bold text-white">1. Kondisi Normal (Baseline Ideal)</div>
+                  <div class="text-[10px] text-slate-400 truncate">4 WAN (Citra, Indibiz, Starlink, Starlite), MikroTik, & 16 Linksys UP.</div>
+                </div>
+              </button>
+
+              <button class="scenario-btn w-full bg-slate-800/80 hover:bg-slate-800 border border-slate-700/80 hover:border-purple-500/50 p-2.5 rounded-xl text-left flex items-start gap-3 transition" data-scenario="STARLINK_RAIN_FADE">
+                <div class="p-2 bg-purple-500/20 text-purple-400 rounded-lg flex-shrink-0"><i class="fa-solid fa-cloud-bolt"></i></div>
+                <div class="min-w-0">
+                  <div class="text-xs font-bold text-white">2. Starlink Rain Fade (Jitter & Latensi Spike)</div>
+                  <div class="text-[10px] text-slate-400 truncate">Badai hujan menyebabkan degradasi sinyal satelit LEO (RTT 130ms+, Loss 8%).</div>
+                </div>
+              </button>
+
+              <button class="scenario-btn w-full bg-slate-800/80 hover:bg-slate-800 border border-slate-700/80 hover:border-red-500/50 p-2.5 rounded-xl text-left flex items-start gap-3 transition" data-scenario="CITRA_ISP_OUTAGE">
+                <div class="p-2 bg-red-500/20 text-red-400 rounded-lg flex-shrink-0"><i class="fa-solid fa-power-off"></i></div>
+                <div class="min-w-0">
+                  <div class="text-xs font-bold text-white">3. Citranet Fiber Putus & Auto Load Balance Failover</div>
+                  <div class="text-[10px] text-slate-400 truncate">ISP Citra Down, PCC otomatis membagi beban ke Indibiz, Starlink, Starlite.</div>
+                </div>
+              </button>
+
+              <button class="scenario-btn w-full bg-slate-800/80 hover:bg-slate-800 border border-slate-700/80 hover:border-amber-500/50 p-2.5 rounded-xl text-left flex items-start gap-3 transition" data-scenario="LINKSYS_LAB_OVERLOAD">
+                <div class="p-2 bg-amber-500/20 text-amber-400 rounded-lg flex-shrink-0"><i class="fa-solid fa-users"></i></div>
+                <div class="min-w-0">
+                  <div class="text-xs font-bold text-white">4. Linksys EA7500 Lab Komputer Overload</div>
+                  <div class="text-[10px] text-slate-400 truncate">AP #03 Lab Komputer penuh 62/64 user Wi-Fi dan memicu alarm kongesti AP.</div>
+                </div>
+              </button>
+
+              <button class="scenario-btn w-full bg-slate-800/80 hover:bg-slate-800 border border-slate-700/80 hover:border-indigo-500/50 p-2.5 rounded-xl text-left flex items-start gap-3 transition" data-scenario="MIKROTIK_HIGH_CPU">
+                <div class="p-2 bg-indigo-500/20 text-indigo-400 rounded-lg flex-shrink-0"><i class="fa-solid fa-microchip"></i></div>
+                <div class="min-w-0">
+                  <div class="text-xs font-bold text-white">5. MikroTik Core High CPU (96%) & Connection Flood</div>
+                  <div class="text-[10px] text-slate-400 truncate">Beban NAT dan conntrack gateway melonjak hingga 86.000 koneksi aktif.</div>
+                </div>
+              </button>
+
+              <button class="scenario-btn w-full bg-slate-800/80 hover:bg-slate-800 border border-slate-700/80 hover:border-rose-500/50 p-2.5 rounded-xl text-left flex items-start gap-3 transition" data-scenario="WAN_FLAPPING">
+                <div class="p-2 bg-rose-500/20 text-rose-400 rounded-lg flex-shrink-0"><i class="fa-solid fa-arrows-rotate"></i></div>
+                <div class="min-w-0">
+                  <div class="text-xs font-bold text-white">6. WAN Flapping (Indibiz Berulang Kali UP/DOWN)</div>
+                  <div class="text-[10px] text-slate-400 truncate">Memicu flap dampening rule untuk mencegah destabilisasi tabel rute routing.</div>
+                </div>
+              </button>
+            </div>
+          </div>
+
+          <div class="text-[10px] text-slate-500 pt-3 border-t border-slate-800/80 flex items-center justify-between">
+            <span>Skenario otomatis kembali ke NORMAL setelah 40 detik</span>
+            <i class="fa-solid fa-clock-rotate-left"></i>
+          </div>
+        </section>
+
+      </div>
+
+      <!-- PANEL: KONTROL OPERASIONAL DUNIA NYATA & LIVE ICMP PING TOOL -->
+      <section class="bg-slate-900/90 border border-emerald-500/30 rounded-2xl p-5 shadow-lg space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-800">
+          <div>
+            <div class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 mb-1">
+              <i class="fa-solid fa-satellite-dish"></i>
+              <span>Hardware & Real Network Integration</span>
+            </div>
+            <h3 class="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+              <i class="fa-solid fa-server text-emerald-400"></i>
+              <span>Mode Operasional Monitoring Dunia Nyata & Live Network Probe</span>
+            </h3>
+            <p class="text-[11px] text-slate-400">Beralih antara probe ICMP fisik dunia nyata, mode cerdas hybrid, dan simulasi pengujian skripsi.</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <a href="/api/export/csv" class="bg-cyan-950 hover:bg-cyan-900 text-cyan-300 border border-cyan-700/60 text-xs px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 font-mono shadow-sm">
+              <i class="fa-solid fa-file-csv"></i>
+              <span>Export CSV (Data Skripsi)</span>
+            </a>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <!-- Pilihan Mode Operasional -->
+          <div class="bg-slate-950/70 border border-slate-800 rounded-xl p-4 space-y-3">
+            <div class="text-xs font-bold text-slate-200 flex items-center justify-between">
+              <span>Pilih Mode Pengambilan Data:</span>
+              <span id="currentModeBadge" class="text-[10px] px-2 py-0.5 rounded-full font-mono font-bold bg-emerald-950 text-emerald-300 border border-emerald-700">
+                HYBRID_SMART
+              </span>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+              <!-- Mode 1: Hybrid Smart -->
+              <button onclick="setOperationalMode('HYBRID_SMART')" id="modeBtn-HYBRID_SMART" class="mode-select-btn p-2.5 rounded-xl border border-emerald-500/60 bg-emerald-950/20 text-left transition hover:border-emerald-400">
+                <div class="font-bold text-emerald-400 flex items-center gap-1.5 text-xs">
+                  <i class="fa-solid fa-brain"></i>
+                  <span>Hybrid Cerdas</span>
+                </div>
+                <div class="text-[10px] text-slate-400 mt-1 leading-snug">Prioritaskan ping fisik riil; fallback jika lab mati.</div>
+              </button>
+
+              <!-- Mode 2: Real Probe 100% -->
+              <button onclick="setOperationalMode('REAL_PROBE')" id="modeBtn-REAL_PROBE" class="mode-select-btn p-2.5 rounded-xl border border-slate-800 bg-slate-900/60 text-left transition hover:border-cyan-400">
+                <div class="font-bold text-cyan-400 flex items-center gap-1.5 text-xs">
+                  <i class="fa-solid fa-tower-broadcast"></i>
+                  <span>Dunia Nyata</span>
+                </div>
+                <div class="text-[10px] text-slate-400 mt-1 leading-snug">100% ICMP Ping fisik. Mati jika kabel dicabut.</div>
+              </button>
+
+              <!-- Mode 3: Simulasi Riset -->
+              <button onclick="setOperationalMode('SIMULATION')" id="modeBtn-SIMULATION" class="mode-select-btn p-2.5 rounded-xl border border-slate-800 bg-slate-900/60 text-left transition hover:border-purple-400">
+                <div class="font-bold text-purple-400 flex items-center gap-1.5 text-xs">
+                  <i class="fa-solid fa-flask"></i>
+                  <span>Simulasi Riset</span>
+                </div>
+                <div class="text-[10px] text-slate-400 mt-1 leading-snug">Uji skenario anomali cuaca & failover skripsi.</div>
+              </button>
+            </div>
+            
+            <p class="text-[10px] text-slate-400 italic">
+              * Mode <strong>Hybrid Cerdas</strong> sangat dianjurkan saat presentasi agar dashboard tetap aktif dan dapat merespons jika ada router yang dihidupkan di laboratorium.
+            </p>
+          </div>
+
+          <!-- Live ICMP Ping Tester Tool -->
+          <div class="bg-slate-950/70 border border-slate-800 rounded-xl p-4 space-y-3">
+            <div class="text-xs font-bold text-slate-200 flex items-center gap-2">
+              <i class="fa-solid fa-terminal text-cyan-400"></i>
+              <span>Live ICMP Ping Probe Tool (Uji IP Hardware Nyata)</span>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <input type="text" id="livePingInput" placeholder="Masukkan IP (contoh: 10.27.42.1 atau 8.8.8.8)" value="8.8.8.8" class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white placeholder-slate-500 font-mono focus:outline-none focus:border-cyan-500">
+              <button onclick="runLivePing()" id="runPingBtn" class="bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5">
+                <i class="fa-solid fa-bolt text-cyan-400"></i>
+                <span>Ping IP</span>
+              </button>
+            </div>
+
+            <!-- Hasil Ping -->
+            <div id="livePingResult" class="bg-slate-900/90 border border-slate-800 rounded-lg p-2.5 text-xs font-mono text-slate-300 min-h-[50px] flex items-center">
+              <span class="text-slate-500 text-[11px]">Siap mengirim ICMP echo packet ke alamat IP target...</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- PANEL 3: STATUS DATABASE MYSQL & KONFIGURASI ENGINE -->
+      <section class="bg-slate-900/90 border border-slate-800 rounded-xl p-4 sm:p-5 shadow-sm space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-800">
+          <div>
+            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+              <i class="fa-solid fa-database text-cyan-400"></i>
+              <span>Status Koneksi Database MySQL & Riwayat Insiden Terkini</span>
+            </h3>
+            <p class="text-[11px] text-slate-400">Logging persistence telemetri time-series dan riwayat log anomali di <code>multi_wan_rpc_db</code></p>
+          </div>
+          <button onclick="refreshDbAnomaliesTable()" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded-lg border border-slate-700 flex items-center gap-1.5 transition">
+            <i class="fa-solid fa-rotate"></i>
+            <span>Refresh Data MySQL</span>
+          </button>
+        </div>
+
+        <!-- Tabel Log Anomali MySQL -->
+        <div class="overflow-x-auto rounded-lg border border-slate-800">
+          <table class="w-full text-left text-xs font-mono">
+            <thead class="bg-slate-950 text-slate-400 uppercase text-[10px] tracking-wider border-b border-slate-800">
+              <tr>
+                <th class="py-2.5 px-3">ID</th>
+                <th class="py-2.5 px-3">Waktu</th>
+                <th class="py-2.5 px-3">WAN / AP</th>
+                <th class="py-2.5 px-3">Tipe Anomali</th>
+                <th class="py-2.5 px-3">Severity</th>
+                <th class="py-2.5 px-3">Z-Score</th>
+                <th class="py-2.5 px-3">Pesan & Rekomendasi</th>
+              </tr>
+            </thead>
+            <tbody id="dbAnomaliesTableBody" class="divide-y divide-slate-800 text-slate-300">
+              <tr>
+                <td colspan="7" class="py-6 text-center text-slate-500 italic">Memuat log kejadian anomali dari database MySQL...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- PANEL 4: MANAJEMEN PERANGKAT ROUTER & ACCESS POINT KAMPUS (CRUD) -->
+      <section class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-sm space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-800">
+          <div>
+            <div class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 mb-1">
+              <i class="fa-solid fa-wifi"></i>
+              <span>Access Point Inventory & CRUD</span>
+            </div>
+            <h3 class="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+              <i class="fa-solid fa-router text-cyan-400"></i>
+              <span>Manajemen Perangkat Router OpenWrt EA7500 & Access Point</span>
+            </h3>
+            <p class="text-[11px] text-slate-400">Daftar seluruh access point kampus UNUGHA. Tambah router baru, ubah alamat IP, nama lokasi, atau hapus perangkat secara dinamis langsung dari browser.</p>
+          </div>
+          
+          <div class="flex items-center gap-2">
+            <button onclick="openAddRouterModal()" class="bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs px-3.5 py-2 rounded-xl transition flex items-center gap-1.5 font-bold shadow-md shadow-cyan-900/30">
+              <i class="fa-solid fa-plus text-xs"></i>
+              <span>Tambah Access Point Baru</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Filter pencarian router di tabel -->
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div class="relative w-full sm:w-72">
+            <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-xs text-slate-400"></i>
+            <input type="text" id="adminRouterSearchInput" oninput="renderAdminRouterTable()" placeholder="Cari nama / IP / lokasi router..." class="w-full bg-slate-800 border border-slate-700 rounded-lg pl-8 pr-3 py-1.5 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-cyan-500">
+          </div>
+          <span class="text-xs text-slate-400 font-mono" id="adminRouterCount">Total: 16 Router Terdaftar</span>
+        </div>
+
+        <!-- Tabel Interaktif CRUD Router -->
+        <div class="overflow-x-auto rounded-xl border border-slate-800">
+          <table class="w-full text-left text-xs font-mono">
+            <thead class="bg-slate-950 text-slate-400 uppercase text-[10px] tracking-wider border-b border-slate-800">
+              <tr>
+                <th class="py-2.5 px-3">ID</th>
+                <th class="py-2.5 px-3">Nama Router</th>
+                <th class="py-2.5 px-3">Alamat IP / Subnet</th>
+                <th class="py-2.5 px-3">Model Hardware</th>
+                <th class="py-2.5 px-3">Lokasi Fisik Gedung</th>
+                <th class="py-2.5 px-3">Uplink Switch / Port</th>
+                <th class="py-2.5 px-3 text-center">Status</th>
+                <th class="py-2.5 px-3 text-center">Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="adminRouterTableBody" class="divide-y divide-slate-800 text-slate-300">
+              <!-- Rendered dynamically by app.js -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- PANEL 5: GENERATOR SKRIP DISTRIBUSI MULTI-WAN MIKROTIK ROUTEROS v7 & OPENWRT EA7500 -->
+      <section class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-sm space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-800">
+          <div>
+            <div class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 mb-1">
+              <i class="fa-solid fa-terminal"></i>
+              <span>Production Script & Configuration Generator</span>
+            </div>
+            <h3 class="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+              <i class="fa-solid fa-code text-indigo-400"></i>
+              <span>Generator Skrip Multi-WAN MikroTik PCC v7 & Konfigurasi OpenWrt EA7500</span>
+            </h3>
+            <p class="text-[11px] text-slate-400">Skrip siap pakai untuk diimpor langsung ke MikroTik Core RouterOS v7 (PCC 4 WAN, Failover, Masquerade) dan file network OpenWrt EA7500.</p>
+          </div>
+          
+          <div class="flex items-center gap-2">
+            <button onclick="downloadCurrentScript()" class="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs px-3.5 py-2 rounded-xl transition flex items-center gap-1.5 font-bold shadow-md shadow-emerald-900/30">
+              <i class="fa-solid fa-download text-xs"></i>
+              <span id="btnDownloadScriptLabel">Unduh .RSC MikroTik</span>
+            </button>
+            <button onclick="copyCurrentScript()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs px-3.5 py-2 rounded-xl transition flex items-center gap-1.5 font-medium">
+              <i class="fa-regular fa-copy text-xs"></i>
+              <span>Salin Skrip</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Script Tabs -->
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2">
+          <div class="flex items-center gap-2">
+            <button id="tabBtnMikrotik" onclick="switchScriptTab('mikrotik')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
+              <i class="fa-solid fa-server"></i>
+              <span>MikroTik RouterOS v7 (PCC 4 WAN)</span>
+            </button>
+            <button id="tabBtnOpenwrt" onclick="switchScriptTab('openwrt')" class="px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1.5 text-slate-400 hover:text-white bg-slate-800/60 border border-slate-700/60">
+              <i class="fa-solid fa-network-wired"></i>
+              <span>OpenWrt EA7500 (/etc/config/network)</span>
+            </button>
+          </div>
+
+          <!-- Router selector dropdown for OpenWrt tab -->
+          <div id="openwrtRouterSelectWrapper" class="hidden flex items-center gap-2">
+            <span class="text-xs text-slate-400">Pilih Router:</span>
+            <select id="openwrtRouterSelect" onchange="loadOpenWrtConfigForSelected()" class="bg-slate-800 text-white border border-slate-700 rounded-lg px-2.5 py-1 text-xs focus:outline-none focus:border-cyan-500 font-mono">
+              <!-- populated dynamically -->
+            </select>
+          </div>
+        </div>
+
+        <!-- Script Code Display -->
+        <div class="relative bg-slate-950 rounded-xl border border-slate-800 p-4 font-mono text-[11px] text-slate-300 overflow-x-auto max-h-96 overflow-y-auto">
+          <pre id="scriptDisplayCode" class="whitespace-pre">Memuat skrip konfigurasi...</pre>
+        </div>
+      </section>
+
+    </div>
+
+  </main>
+
+  <!-- ==================================================================== -->
+  <!-- FOOTER -->
+  <!-- ==================================================================== -->
+  <footer class="bg-slate-900/60 border-t border-slate-800/80 py-3.5 px-4 text-center text-[11px] text-slate-400 font-sans">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
+      <div class="flex items-center gap-2">
+        <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
+        <span>Integrasi RPC Multi-WAN Real-Time • Skripsi UNUGHA</span>
+      </div>
+      <div>
+        <span>Mahasiswa: <strong class="text-slate-200">Mohammad Asngad</strong> • UNUGHA Cilacap</span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ==================================================================== -->
+  <!-- TOAST NOTIFICATION CONTAINER (NOTIFIKASI POPUP APLIKASI) -->
+  <!-- ==================================================================== -->
+  <div id="toastContainer" class="fixed top-20 right-4 z-50 space-y-2 pointer-events-none max-w-sm w-full"></div>
+
+  <!-- ==================================================================== -->
+  <!-- MODAL: LOGIN & REGISTRASI PENGGUNA (MYSQL INTEGRATED) -->
+  <!-- ==================================================================== -->
+  <div id="authModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-5 sm:p-6 shadow-2xl relative">
+      
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 flex items-center justify-center font-bold">
+            <i class="fa-solid fa-user-lock"></i>
+          </div>
+          <div>
+            <h2 id="authModalTitle" class="text-sm sm:text-base font-bold text-white tracking-tight">Masuk ke Sistem NOC</h2>
+            <p id="authModalSubtitle" class="text-[11px] text-slate-400">Monitoring Jaringan Multi-WAN UNUGHA</p>
+          </div>
+        </div>
+        <button onclick="closeAuthModal()" class="text-slate-400 hover:text-white p-1 text-lg">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <!-- Alert Message Box -->
+      <div id="authAlertBox" class="hidden mb-4 mt-4 p-2.5 rounded-lg text-xs flex items-center gap-2"></div>
+
+      <!-- VIEW KHUSUS SAAT SUDAH LOGIN (DENGAN TOMBOL LOGOUT PROMINEN) -->
+      <div id="authLoggedInView" class="hidden space-y-4 mb-4 mt-4">
+        <div class="bg-slate-950/70 border border-slate-800 rounded-xl p-4 text-center space-y-2">
+          <div class="w-12 h-12 rounded-full bg-cyan-500/20 text-cyan-400 border border-cyan-500/40 mx-auto flex items-center justify-center text-lg shadow-md shadow-cyan-500/20">
+            <i class="fa-solid fa-user-check"></i>
+          </div>
+          <div>
+            <div id="modalLoggedInName" class="font-bold text-white text-sm">Mohammad Asngad</div>
+            <div id="modalLoggedInRole" class="text-xs text-cyan-400 font-mono">ADMINISTRATOR</div>
+            <div id="modalLoggedInEmail" class="text-[11px] text-slate-400 font-mono">admin@unugha.ac.id</div>
+          </div>
+          <div class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span>Sesi Aktif di Aplikasi</span>
+          </div>
+        </div>
+
+        <!-- Tombol Logout Langsung di Menu Login -->
+        <button type="button" onclick="logoutFromAuthModal()" class="w-full bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-bold py-2.5 rounded-xl text-xs shadow-md shadow-rose-900/30 transition flex items-center justify-center gap-2">
+          <i class="fa-solid fa-arrow-right-from-bracket"></i>
+          <span>Logout / Keluar dari Akun</span>
+        </button>
+
+        <button type="button" onclick="switchLoggedInToLoginForm()" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 py-2 rounded-xl text-xs font-semibold border border-slate-700 transition flex items-center justify-center gap-1.5">
+          <i class="fa-solid fa-users"></i>
+          <span>Ganti Akun Lain</span>
+        </button>
+      </div>
+
+      <!-- FORM 1: LOGIN -->
+      <form id="loginForm" onsubmit="handleLoginSubmit(event)" class="space-y-3.5 mt-4">
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">Username atau Email:</label>
+          <div class="relative">
+            <i class="fa-solid fa-user absolute left-3 top-2.5 text-xs text-slate-400"></i>
+            <input type="text" id="loginIdentifier" required placeholder="admin atau email..." class="w-full bg-slate-800 border border-slate-700 rounded-lg pl-8 pr-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500">
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">Kata Sandi:</label>
+          <div class="relative">
+            <i class="fa-solid fa-lock absolute left-3 top-2.5 text-xs text-slate-400"></i>
+            <input type="password" id="loginPassword" required placeholder="••••••••" class="w-full bg-slate-800 border border-slate-700 rounded-lg pl-8 pr-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500">
+          </div>
+        </div>
+
+        <button type="submit" id="loginSubmitBtn" class="w-full bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold py-2 rounded-lg text-xs shadow-md shadow-cyan-900/30 transition flex items-center justify-center gap-1.5">
+          <i class="fa-solid fa-right-to-bracket"></i>
+          <span>Masuk ke Sistem</span>
+        </button>
+
+        <div class="text-center pt-2 text-xs text-slate-400 border-t border-slate-800/80">
+          Belum memiliki akun?
+          <button type="button" onclick="switchAuthTab('register')" class="text-cyan-400 hover:text-cyan-300 font-semibold hover:underline ml-1">
+            Registrasi di sini
+          </button>
+        </div>
+      </form>
+
+      <!-- FORM 2: REGISTRASI -->
+      <form id="registerForm" onsubmit="handleRegisterSubmit(event)" class="hidden space-y-3 mt-4">
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">Nama Lengkap:</label>
+          <input type="text" id="regFullname" required placeholder="contoh: Mohammad Asngad" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500">
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-xs font-medium text-slate-300 mb-1">Username:</label>
+            <input type="text" id="regUsername" required placeholder="operator1" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500">
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-300 mb-1">Peran / Role:</label>
+            <select id="regRole" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500">
+              <option value="operator">Operator NOC</option>
+              <option value="admin">Administrator</option>
+              <option value="viewer">Pengamat (Read Only)</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">Email:</label>
+          <input type="email" id="regEmail" required placeholder="nama@unugha.ac.id" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">Kata Sandi (Min 6 Karakter):</label>
+          <input type="password" id="regPassword" required minlength="6" placeholder="••••••••" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500">
+        </div>
+
+        <button type="submit" id="regSubmitBtn" class="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold py-2 rounded-lg text-xs shadow-md shadow-emerald-900/30 transition flex items-center justify-center gap-1.5">
+          <i class="fa-solid fa-user-check"></i>
+          <span>Daftarkan Akun Baru</span>
+        </button>
+
+        <div class="text-center pt-2 text-xs text-slate-400 border-t border-slate-800/80">
+          Sudah memiliki akun?
+          <button type="button" onclick="switchAuthTab('login')" class="text-cyan-400 hover:text-cyan-300 font-semibold hover:underline ml-1">
+            Masuk ke Sistem
+          </button>
+        </div>
+      </form>
+
+    </div>
+  </div>
+
+  <!-- ==================================================================== -->
+  <!-- MODAL: NOTIFIKASI PILIHAN KELUAR ATAU TETAP DI APLIKASI -->
+  <!-- ==================================================================== -->
+  <div id="exitConfirmModal" class="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 hidden flex items-center justify-center p-4 transition-all">
+    <div class="bg-slate-900 border border-slate-700/80 rounded-2xl max-w-sm w-full p-6 shadow-2xl text-center space-y-4 relative animate-fadeInView">
+      
+      <!-- Icon Peringatan Keluar -->
+      <div class="w-16 h-16 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/40 mx-auto flex items-center justify-center text-2xl shadow-lg shadow-amber-500/20">
+        <i class="fa-solid fa-door-open animate-bounce"></i>
+      </div>
+
+      <!-- Judul & Pesan Notifikasi -->
+      <div>
+        <h3 class="text-base font-bold text-white tracking-tight">Konfirmasi Sesi Monitoring</h3>
+        <p class="text-xs text-slate-300 mt-2 leading-relaxed">
+          Apakah Anda ingin <strong class="text-emerald-400 font-semibold">tetap berada di aplikasi</strong> monitoring atau <strong class="text-rose-400 font-semibold">keluar dari sistem</strong>?
+        </p>
+      </div>
+
+      <!-- Tombol Pilihan Interaktif -->
+      <div class="grid grid-cols-2 gap-2.5 pt-2">
+        <!-- Pilihan 1: Tetap di Aplikasi -->
+        <button type="button" onclick="stayInApplication()" class="w-full bg-slate-800 hover:bg-slate-700 text-emerald-400 hover:text-emerald-300 border border-slate-700 hover:border-emerald-500/50 py-2.5 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5">
+          <i class="fa-solid fa-shield-halved"></i>
+          <span>Tetap di Sini</span>
+        </button>
+
+        <!-- Pilihan 2: Keluar dari Aplikasi -->
+        <button type="button" onclick="confirmExitApplication()" class="w-full bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white py-2.5 px-3 rounded-xl text-xs font-bold shadow-md shadow-rose-900/30 transition flex items-center justify-center gap-1.5">
+          <i class="fa-solid fa-arrow-right-from-bracket"></i>
+          <span>Keluar Sesi</span>
+        </button>
+      </div>
+
+      <div class="text-[10px] text-slate-500 pt-1 font-mono">
+        Sistem Monitoring Multi-WAN UNUGHA
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ==================================================================== -->
+  <!-- MODAL: FORM TAMBAH / EDIT ROUTER ACCESS POINT                        -->
+  <!-- ==================================================================== -->
+  <div id="routerFormModal" class="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 hidden flex items-center justify-center p-4 transition-all">
+    <div class="bg-slate-900 border border-slate-700/80 rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-2xl space-y-4 relative animate-fadeInView">
+      
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 flex items-center justify-center text-sm">
+            <i class="fa-solid fa-router" id="routerModalIcon"></i>
+          </div>
+          <div>
+            <h3 class="text-sm sm:text-base font-bold text-white tracking-tight" id="routerModalTitle">Tambah Access Point Baru</h3>
+            <p class="text-[11px] text-slate-400">Daftarkan atau perbarui perangkat router pada jaringan kampus</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeRouterModal()" class="text-slate-400 hover:text-white transition p-1.5 rounded-lg hover:bg-slate-800">
+          <i class="fa-solid fa-xmark text-sm"></i>
+        </button>
+      </div>
+
+      <!-- Form Tambah / Edit -->
+      <form id="routerEditForm" onsubmit="handleRouterFormSubmit(event)" class="space-y-3">
+        <input type="hidden" id="routerFormMode" value="CREATE">
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-medium text-slate-300 mb-1">ID Perangkat (Unique):</label>
+            <input type="text" id="formRouterId" required placeholder="contoh: ea7500-17" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono">
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-300 mb-1">Nama Perangkat:</label>
+            <input type="text" id="formRouterName" required placeholder="contoh: Perpus-Lt3" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-medium text-slate-300 mb-1">Alamat IP & Subnet:</label>
+            <input type="text" id="formRouterIp" required placeholder="contoh: 10.0.2.30/24" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono">
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-300 mb-1">Model Hardware:</label>
+            <select id="formRouterModel" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500">
+              <option value="Linksys OpenWrt EA7500">Linksys OpenWrt EA7500</option>
+              <option value="Linksys OpenWrt EA7500 (EW1200G-PRO)">EW1200G-PRO (OpenWrt)</option>
+              <option value="Linksys OpenWrt EA7500 / EA6200">Linksys EA6200 / EA7500</option>
+              <option value="Switch Distribusi Lab (Unmanaged)">Switch Distribusi Lab</option>
+              <option value="Ruijie ES208GC">Ruijie ES208GC Switch</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">Lokasi Fisik Gedung:</label>
+          <input type="text" id="formRouterLocation" required placeholder="contoh: Gedung Perpustakaan Lantai 3 Ruang Diskusi" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500">
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-medium text-slate-300 mb-1">Cabang Topologi:</label>
+            <select id="formRouterBranch" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500">
+              <option value="Perpus & Rektorat">Perpus & Rektorat</option>
+              <option value="Gedung D & Kelas A">Gedung D & Kelas A</option>
+              <option value="LabKOM & Gedung H">LabKOM & Gedung H</option>
+              <option value="Gedung Baru / Perluasan">Gedung Baru / Perluasan</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-300 mb-1">Kapasitas Klien Wi-Fi:</label>
+            <input type="number" id="formRouterMaxClients" value="64" min="10" max="250" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">Jalur Uplink / Switch Terhubung:</label>
+          <input type="text" id="formRouterUplink" required placeholder="contoh: SW-Perpus [Port 3] ➔ WAN" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono">
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">Jalur Downlink / Area Layanan:</label>
+          <input type="text" id="formRouterDownlink" placeholder="contoh: Area Wi-Fi Mahasiswa Lt. 3" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono">
+        </div>
+
+        <div class="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+          <button type="button" onclick="closeRouterModal()" class="px-4 py-2 rounded-xl text-xs font-medium bg-slate-800 text-slate-300 hover:bg-slate-700 transition">
+            Batal
+          </button>
+          <button type="submit" id="saveRouterBtn" class="px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white transition flex items-center gap-1.5 shadow-md shadow-cyan-900/30">
+            <i class="fa-solid fa-floppy-disk"></i>
+            <span>Simpan Perangkat</span>
+          </button>
+        </div>
+      </form>
+
+    </div>
+  </div>
+
+  <!-- SCRIPT LOGIC -->
+  <script src="/js/app.js"></script>
+</body>
+</html>

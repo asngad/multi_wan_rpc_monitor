@@ -1,0 +1,210 @@
+/* Custom Styling untuk NOC Cyberpunk / High-Tech Dashboard */
+
+@keyframes pulse-subtle {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0f172a;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
+/* Card hover animation */
+.wan-card {
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.wan-card:hover {
+  transform: translateY(-2px);
+  border-color: #38bdf8;
+  box-shadow: 0 10px 25px -5px rgba(6, 182, 212, 0.15);
+}
+
+/* Glow effects */
+.glow-cyan {
+  box-shadow: 0 0 15px rgba(6, 182, 212, 0.35);
+}
+
+.glow-emerald {
+  box-shadow: 0 0 15px rgba(16, 185, 129, 0.35);
+}
+
+.glow-rose {
+  box-shadow: 0 0 15px rgba(244, 63, 94, 0.4);
+}
+
+/* Mobile & Touch Improvements (Android & iOS) */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  padding-bottom: env(safe-area-inset-bottom, 1rem);
+}
+
+.nav-tab-btn, .mobile-nav-btn {
+  user-select: none;
+  cursor: pointer;
+}
+
+/* Smooth Tab Fade Transitions */
+#view-dashboard, #view-topologi, #view-admin {
+  animation: fadeInView 0.25s ease-in-out;
+}
+
+@keyframes fadeInView {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Mobile Scrolling Optimization */
+.overflow-x-auto, .overflow-y-auto {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ==================================================================== */
+/* TOPOLOGI VISUAL TREE DIAGRAM (HIERARKI MULTI-WAN KAMPUS UNUGHA)      */
+/* ==================================================================== */
+
+.topo-canvas {
+  background: radial-gradient(circle at 50% 15%, rgba(15, 23, 42, 0.95), rgba(2, 6, 23, 0.98));
+  position: relative;
+}
+
+.topo-node {
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  user-select: none;
+  background-color: rgba(15, 23, 42, 0.92);
+  border: 1px solid rgba(51, 65, 85, 0.8);
+}
+
+.topo-node:hover {
+  transform: translateY(-2px);
+  border-color: #22d3ee;
+  box-shadow: 0 8px 24px -4px rgba(34, 211, 238, 0.3);
+}
+
+.topo-node.active-trace {
+  border-color: #06b6d4 !important;
+  background: linear-gradient(135deg, rgba(8, 51, 68, 0.95), rgba(15, 23, 42, 0.98)) !important;
+  box-shadow: 0 0 25px rgba(6, 182, 212, 0.55), inset 0 0 15px rgba(6, 182, 212, 0.25) !important;
+  animation: pulse-node 1.8s infinite;
+}
+
+@keyframes pulse-node {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(6, 182, 212, 0.45);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(6, 182, 212, 0.85);
+  }
+}
+
+.topo-line-v {
+  width: 2px;
+  background-color: #10b981;
+  margin: 0 auto;
+}
+
+.topo-line-v.active-trace {
+  background-color: #22d3ee !important;
+  box-shadow: 0 0 8px #22d3ee;
+  width: 3px;
+}
+
+.topo-line-h {
+  height: 2px;
+  background-color: #10b981;
+}
+
+.topo-line-h.active-trace {
+  background-color: #22d3ee !important;
+  box-shadow: 0 0 8px #22d3ee;
+  height: 3px;
+}
+
+.topo-line-dashed {
+  background: repeating-linear-gradient(to bottom, #10b981 0, #10b981 6px, transparent 6px, transparent 12px) !important;
+}
+
+.topo-line-dashed.active-trace {
+  background: repeating-linear-gradient(to bottom, #22d3ee 0, #22d3ee 6px, transparent 6px, transparent 12px) !important;
+  box-shadow: 0 0 8px #22d3ee;
+}
+
+.port-tag {
+  background: #022c22;
+  color: #6ee7b7;
+  border: 1px solid #059669;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 9.5px;
+  padding: 1.5px 6px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+}
+
+.port-tag.active-trace {
+  background: #083344 !important;
+  color: #67e8f9 !important;
+  border-color: #06b6d4 !important;
+  box-shadow: 0 0 10px rgba(6, 182, 212, 0.6) !important;
+}
+
+.badge-dev-type {
+  width: 26px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 800;
+  border-radius: 4px;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+}
+
+.badge-dev-router {
+  background: #1e293b;
+  color: #f1f5f9;
+  border: 1px solid #475569;
+}
+
+.badge-dev-switch {
+  background: #0f172a;
+  color: #38bdf8;
+  border: 1px solid #0284c7;
+}
+

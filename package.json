@@ -1,0 +1,46 @@
+{
+  "name": "multi-wan-rpc-monitor",
+  "version": "1.0.0",
+  "description": "Sistem Monitoring Kinerja Multi-WAN Berbasis Web Real-Time Menggunakan RPC dan Deteksi Dini Anomali Trafik",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "test": "jest --runInBand --detectOpenHandles",
+    "test:coverage": "jest --coverage",
+    "benchmark": "node src/services/benchmarkService.js"
+  },
+  "keywords": [
+    "multi-wan",
+    "rpc",
+    "json-rpc",
+    "anomaly-detection",
+    "z-score",
+    "ewma",
+    "realtime-monitoring",
+    "socket.io",
+    "express",
+    "noc-dashboard"
+  ],
+  "author": "Mohammad Asngad - UNUGHA",
+  "license": "MIT",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "jayson": "^4.1.1",
+    "mysql2": "^3.24.6",
+    "socket.io": "^4.8.1"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "nodemon": "^3.1.9",
+    "supertest": "^7.0.0"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "coveragePathIgnorePatterns": [
+      "/node_modules/"
+    ]
+  }
+}
