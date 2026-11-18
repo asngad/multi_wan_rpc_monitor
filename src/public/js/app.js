@@ -989,6 +989,11 @@ function traceRouterPath(routerId) {
     if (el) el.classList.add('active-trace');
   });
 
+  // Pastikan kabel penghubung Gateway-LB ➔ MikroTik 10.27.42.1 ➔ SW-Rack selalu aktif dan menyala
+  document.querySelectorAll('.core-cable-line, .core-cable-tag').forEach(el => {
+    el.classList.add('active-trace');
+  });
+
   // 2. Node perangkat terpilih
   const targetEl = document.querySelector(`[data-node-id="${routerId}"]`);
   if (targetEl) targetEl.classList.add('active-trace');

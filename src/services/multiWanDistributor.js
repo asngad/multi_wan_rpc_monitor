@@ -172,6 +172,8 @@ class MultiWanDistributor {
 # 1. Konfigurasi Antarmuka LAN & Bridge Kampus
 # --------------------------------------------------------------------
 /interface bridge add name=bridge-LAN comment="Bridge Distribusi Kampus UNUGHA"
+/interface bridge set bridge-LAN arp=proxy-arp comment="Aktifkan Proxy-ARP agar seluruh subnet router bisa jangkau gateway 10.27.42.1"
+/interface bridge port add bridge=bridge-LAN interface=eth6-hab1 comment="Port Trunk Downlink ke 012-SW-Rack G11"
 /ip address add address=10.27.42.1/24 interface=bridge-LAN comment="Gateway Core MikroTik CHR"
 
 # --------------------------------------------------------------------
@@ -259,10 +261,11 @@ add chain=prerouting in-interface=bridge-LAN connection-mark=WAN2_conn action=ma
 add chain=prerouting in-interface=bridge-LAN connection-mark=WAN3_conn action=mark-routing new-routing-mark=to_WAN3 passthrough=no
 
 # --------------------------------------------------------------------
-# 6. FASTTRACK BYPASS (RouterOS v7 Best Practice)
-# FastTrack hanya untuk paket tanpa connection-mark, agar PCC tidak bypass
+# 6. FIREWALL FILTER (INPUT PROTECTION & FASTTRACK BYPASS)
 # --------------------------------------------------------------------
 /ip firewall filter
+add chain=input in-interface=bridge-LAN action=accept comment="Allow all LAN clients to Gateway 10.27.42.1"
+add chain=input protocol=icmp action=accept comment="Allow ICMP Ping to Gateway 10.27.42.1"
 add chain=forward action=fasttrack-connection connection-state=established,related connection-mark=no-mark comment="Fasttrack only unmarked traffic"
 
 # --------------------------------------------------------------------
