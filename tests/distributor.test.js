@@ -54,13 +54,15 @@ describe('Multi-WAN Real-Time Distributor & Internet Routing', () => {
     const script = multiWanDistributor.generateMikrotikPccScript();
     expect(script).toContain('/routing table add name=to_WAN fib');
     expect(script).toContain('/ip firewall mangle');
-    expect(script).toContain('per-connection-classifier=both-addresses-and-ports:4/');
+    expect(script).toContain('per-connection-classifier=both-addresses-and-ports:11/');
     expect(script).toContain('/ip firewall nat');
     expect(script).toContain('action=masquerade');
     expect(script).toContain('10.27.42.1');
     expect(script).toContain('10.27.22.45');
     expect(script).toContain('10.27.51.12');
     expect(script).toContain('10.27.41.12');
+    expect(script).toContain('target-scope=11');
+    expect(script).toContain('add name=PCQ-Download kind=pcq');
   });
 
   test('generateOpenWrtConfig generates correct EA7500 network file', () => {
