@@ -31,12 +31,15 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Port dinamis untuk Railway / Vercel / Local
+const PORT = process.env.PORT || config.server.port || 4000;
+
 // 1. Inisialisasi RPC Server & Handler
 const rpcServer = new RpcServerModule(io);
 app.post(config.server.rpcEndpoint, rpcServer.middleware());
 
 // 2. Inisialisasi Background RPC Client Probe
-const rpcProbe = new RpcClientProbe(`http://127.0.0.1:${config.server.port}${config.server.rpcEndpoint}`);
+const rpcProbe = new RpcClientProbe(`http://127.0.0.1:${PORT}${config.server.rpcEndpoint}`);
 apiController.setDependencies(rpcProbe, io);
 
 // 3. Routing REST API
