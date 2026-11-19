@@ -151,3 +151,50 @@ multi-wan-rpc-monitor/
 - **Bab 3 (Metodologi Penelitian)**: Diagram Use Case, Arsitektur Sistem Antigravity, Diagram Sequence, Class Diagram, dan Matriks Pengujian Anomali.
 - **Bab 4 (Hasil dan Pembahasan)**: Hasil implementasi dashboard NOC, pengujian fungsionalitas, hasil akurasi deteksi skenario injeksi anomali, serta data komparasi numerik pengujian performa RPC vs REST Polling.
 - **Bab 5 (Kesimpulan dan Saran)**: Rekomendasi implementasi di router produksi (MikroTik RouterOS API / Linux eBPF probe).
+
+---
+
+## 🐳 Panduan Deployment Docker Compose & Cloudflare Tunnel (`/home/asngad/`)
+
+Aplikasi ini telah dilengkapi konfigurasi kontainerisasi siap pakai (`Dockerfile`, `docker-compose.yml`) yang mengemas 3 layanan terkoordinasi:
+1. **`app`**: Backend Node.js 20 & WebSocket Engine (Port 4000).
+2. **`mysql`**: Database MySQL 8.0 dengan *persistent volume* dan inisialisasi skema otomatis (`schema.sql`).
+3. **`tunnel`**: Cloudflare Tunnel resmi (`cloudflare/cloudflared`) yang memublikasikan sistem ke internet secara aman tanpa perlu IP Publik Statis atau Port Forwarding pada router.
+
+### Langkah-langkah di Home Server (`/home/asngad/`):
+
+1. **Masuk ke folder home server:**
+   ```bash
+   cd /home/asngad
+   ```
+
+2. **Clone repositori GitHub:**
+   ```bash
+   git clone https://github.com/asngad/multi_wan_rpc_monitor.git
+   cd multi_wan_rpc_monitor
+   ```
+
+3. **(Opsional) Siapkan Environment:**
+   ```bash
+   cp .env.docker.example .env
+   ```
+
+4. **Jalankan seluruh stack kontainer di latar belakang:**
+   ```bash
+   docker compose up -d --build
+   ```
+
+5. **Lihat URL Publik Cloudflare Tunnel:**
+   ```bash
+   docker compose logs -f tunnel
+   ```
+   > URL HTTPS publik instan (misal: `https://xxxx.trycloudflare.com`) akan tampil di baris log. Sistem dapat langsung diakses dari HP atau luar jaringan kampus dengan enkripsi SSL resmi!
+
+6. **Akses Lokal Jaringan Rumah / Kampus:**
+   - Akses via browser: `http://<IP_HOME_SERVER>:4000` (contoh: `http://192.168.1.50:4000`)
+
+7. **Perintah Manajemen Kontainer:**
+   - Cek status kontainer: `docker compose ps`
+   - Lihat log aplikasi: `docker compose logs -f app`
+   - Matikan sistem: `docker compose down`
+   - Restart sistem: `docker compose restart`

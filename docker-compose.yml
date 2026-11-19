@@ -1,0 +1,97 @@
+version: '3.8'
+
+# ==============================================================================
+# Multi-WAN RPC Monitor - Docker Compose Stack
+# Didesain khusus untuk Home Server (e.g. /home/asngad/multi_wan_rpc_monitor)
+# 
+# Services:
+#   1. app: Node.js 20 Alpine (Express + WebSocket + RPC Probe)
+#   2. mysql: MySQL 8.0 Database (Persistent Volume + Auto Init Schema)
+#   3. tunnel: Cloudflare Tunnel (Akses HTTPS Publik Aman tanpa Buka Port Router)
+# ==============================================================================
+
+services:
+  # ----------------------------------------------------------------------------
+  # 1. Backend & Frontend Monitoring Service
+  # ----------------------------------------------------------------------------
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: multiwan_app
+    restart: unless-stopped
+    ports:
+      - "4000:4000" # Akses lokal via IP Home Server: http://192.168.x.x:4000
+    environment:
+      - NODE_ENV=production
+      - PORT=4000
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_USER=root
+      - DB_PASSWORD=${DB_PASSWORD:-multiwan_secure_pass_2026}
+      - DB_NAME=multi_wan_rpc_db
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - multiwan_net
+
+  # ----------------------------------------------------------------------------
+  # 2. Database Server MySQL 8.0
+  # ----------------------------------------------------------------------------
+  mysql:
+    image: mysql:8.0
+    container_name: multiwan_mysql
+    restart: unless-stopped
+    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-multiwan_secure_pass_2026}
+      MYSQL_DATABASE: multi_wan_rpc_db
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -p$${MYSQL_ROOT_PASSWORD} || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - multiwan_net
+
+  # ----------------------------------------------------------------------------
+  # 3. Cloudflare Tunnel (Publikasi Internet Aman & Real-time)
+  # ----------------------------------------------------------------------------
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: multiwan_tunnel
+    restart: unless-stopped
+    depends_on:
+      - app
+    networks:
+      - multiwan_net
+    # ==========================================================================
+    # MODE 1 (DEFAULT - ZERO CONFIG): Quick Tunnel
+    # Menghasilkan URL acak gratis bersertifikat SSL https://*.trycloudflare.com
+    # Cek URL dengan: docker compose logs -f tunnel
+    # ==========================================================================
+    command: tunnel --no-autoupdate --url http://app:4000
+
+    # ==========================================================================
+    # MODE 2 (CUSTOM DOMAIN RESMI): Cloudflare Zero Trust Named Tunnel
+    # Jika Anda memiliki custom domain (misal: unugha.ac.id atau asngad.id):
+    # 1. Buat tunnel di https://one.dash.cloudflare.com/ -> Networks -> Tunnels
+    # 2. Isi TUNNEL_TOKEN di file .env: TUNNEL_TOKEN=eyJh...
+    # 3. Beri komentar pada baris MODE 1 di atas, dan aktifkan baris di bawah:
+    # command: tunnel --no-autoupdate run --token ${TUNNEL_TOKEN}
+    # ==========================================================================
+
+volumes:
+  mysql_data:
+    driver: local
+
+networks:
+  multiwan_net:
+    driver: bridge
